@@ -17,6 +17,7 @@ router.get('/', async (req, res) => {
   };
 
   try {
+    // Aggregation for totals
     let totals = await Record.aggregate([
       { $match: matchCondition },
       {
@@ -60,7 +61,7 @@ router.get('/', async (req, res) => {
       { $sort: { "_id.milkType": 1 } }
     ]);
 
-    // Ensure COW, BUF, TOTAL are present even if empty
+    // Ensure COW, BUF, TOTAL always exist
     const milkTypes = ['COW', 'BUF', 'TOTAL'];
     milkTypes.forEach(type => {
       if (!totals.find(t => t._id.milkType === type)) {
@@ -77,7 +78,7 @@ router.get('/', async (req, res) => {
       }
     });
 
-    // Sort and format averages
+    // Format averages and sort by milk type
     totals.sort((a, b) => milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType));
     totals = totals.map(item => ({
       ...item,
@@ -86,13 +87,23 @@ router.get('/', async (req, res) => {
       averageRate: item.averageRate ? item.averageRate.toFixed(2) : 0
     }));
 
+    // Fetch records and enrich with AMOUNT and TOTAL
     const records = await Record.find(matchCondition);
+    const enrichedRecords = records.map(r => {
+      const amount = (r.RATE || 0) * (r.QTY || 0);
+      const total = amount + (r.INCENTIVEAMOUNT || 0);
+      return {
+        ...r._doc,
+        AMOUNT: +amount.toFixed(2),
+        TOTAL: +total.toFixed(2),
+      };
+    });
 
     if (totals.length === 0 && records.length === 0) {
       return res.status(404).json({ error: 'No records found for the given device code and date.' });
     }
 
-    return res.json({ totals, records });
+    return res.json({ totals, records: enrichedRecords });
   } catch (err) {
     console.error('Error generating report:', err);
     res.status(500).json({ error: err.message || 'Internal server error', stack: err.stack });

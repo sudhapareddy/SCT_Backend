@@ -3,7 +3,6 @@ const multer = require("multer");
 const fs = require("fs");
 const csv = require("csv-parser");
 const mongoose = require("mongoose");
-const verifyToken = require("../../middlewares/authMiddleware");
 const deviceModel = require("../../models/DeviceModel");
 
 const router = express.Router();
@@ -16,7 +15,7 @@ const deleteFile = (path) => {
   });
 };
 
-router.post("/", verifyToken, upload.single("file"), async (req, res) => {
+router.post("/", upload.single("file"), async (req, res) => {
   const filePath = req.file?.path;
   if (!filePath) return res.status(400).json({ error: "No file uploaded" });
 

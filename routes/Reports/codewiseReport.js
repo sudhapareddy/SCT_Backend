@@ -93,15 +93,18 @@ router.get('/', async (req, res) => {
 
     totals.sort((a, b) => milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType));
 
-    // Round avg values
+    // Round averages
     totals = totals.map(item => ({
       ...item,
-      averageFat: item.averageFat ? item.averageFat.toFixed(1) : 0,
-      averageSNF: item.averageSNF ? item.averageSNF.toFixed(1) : 0,
-      averageRate: item.averageRate ? item.averageRate.toFixed(2) : 0
+      averageFat: item.averageFat ? item.averageFat.toFixed(1) : "0.0",
+      averageSNF: item.averageSNF ? item.averageSNF.toFixed(1) : "0.0",
+      averageRate: item.averageRate ? item.averageRate.toFixed(2) : "0.00",
+      totalQuantity: item.totalQuantity?.toFixed(2) || "0.00",
+      totalAmount: item.totalAmount?.toFixed(2) || "0.00",
+      totalIncentive: item.totalIncentive?.toFixed(2) || "0.00"
     }));
 
-    // ✅ updated records query to use aggregate + $dateFromString + sort by date
+    // Fetch and enrich records
     const records = await Record.aggregate([
       {
         $addFields: {
@@ -117,14 +120,24 @@ router.get('/', async (req, res) => {
           parsedDate: { $gte: new Date(fromDate), $lte: new Date(toDate) }
         }
       },
-      { $sort: { parsedDate: 1 } } // Sort by parsedDate in ascending order
+      { $sort: { parsedDate: 1 } }
     ]);
 
-    if (totals.length === 0 && records.length === 0) {
+    const enrichedRecords = records.map(record => {
+      const amount = (record.QTY || 0) * (record.RATE || 0);
+      const incentive = record.INCENTIVEAMOUNT || 0;
+      return {
+        ...record,
+        AMOUNT: amount,
+        TOTAL: (amount + incentive),
+      };
+    });
+
+    if (totals.length === 0 && enrichedRecords.length === 0) {
       return res.status(404).json({ error: 'No records found for the given criteria.' });
     }
 
-    res.json({ totals, records });
+    res.json({ totals, records: enrichedRecords });
   } catch (err) {
     console.error('Error generating codewise report:', err);
     res.status(500).json({ error: err.message || 'Internal server error', stack: err.stack });

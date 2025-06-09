@@ -23,7 +23,7 @@ const deleteFile = (filePath) => {
   });
 };
 
-router.post("/", verifyToken, upload.single("file"), async (req, res) => {
+router.post("/", upload.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded" });
   }
