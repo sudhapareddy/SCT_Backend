@@ -47,7 +47,6 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
 
   const effectiveDate = req.body.snfCowEffectiveDate;
 
-  
   const date = new Date(effectiveDate);
 
   const dd = String(date.getDate()).padStart(2, "0");
@@ -56,7 +55,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
 
   const formattedDate = dd + mm + yy;
 
-  if (!formattedDate)) {
+  if (!formattedDate) {
     deleteFile(filePath);
     return res.status(400).json({ error: "Invalid or missing effective date" });
   }
