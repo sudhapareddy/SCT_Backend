@@ -28,14 +28,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
 
   const filePath = req.file.path;
   const user = req.user;
-  const fatBufEffectiveDate = req.body?.fatBufEffectiveDate?.replace(/\//g, "");
-
-  if (!fatBufEffectiveDate) {
-    deleteFile(filePath);
-    return res
-      .status(400)
-      .json({ error: "Missing fatBufEffectiveDate in request body" });
-  }
+  const fatBufEffectiveDate = req.body?.fatBufEffectiveDate;
 
   const date = new Date(fatBufEffectiveDate);
 
@@ -44,6 +37,15 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
   const yy = String(date.getFullYear()).slice(-2);
 
   const formattedDate = dd + mm + yy;
+
+  console.log(fatBufEffectiveDate, formattedDate); // Output: "100625"
+
+  if (!fatBufEffectiveDate) {
+    deleteFile(filePath);
+    return res
+      .status(400)
+      .json({ error: "Missing fatBufEffectiveDate in request body" });
+  }
 
   if (!user || (user.role !== "dairy" && user.role !== "device")) {
     deleteFile(filePath);
