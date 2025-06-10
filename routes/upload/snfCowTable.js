@@ -122,7 +122,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
             $set: {
               "rateChartIds.snfCowId": snfCowId,
               "effectiveDates.snfCowEffectiveDate": formattedDate,
-              isDeviceRateTable: true,
+              "isDeviceRateTable.snfCowTable": true,
             },
           });
         } else {
@@ -132,7 +132,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
               $set: {
                 "rateChartIds.snfCowId": snfCowId,
                 "effectiveDates.snfCowEffectiveDate": formattedDate,
-                isDeviceRateTable: false,
+                "isDeviceRateTable.snfCowTable": false,
               },
             }
           );

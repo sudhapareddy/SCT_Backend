@@ -57,8 +57,10 @@ const DeviceSchema = new mongoose.Schema(
       default: "device",
     },
     isDeviceRateTable: {
-      type: Boolean,
-      default: false, // or true, based on what you want
+      fatBufTable: { type: Boolean, default: false },
+      fatCowTable: { type: Boolean, default: false },
+      snfBufTable: { type: Boolean, default: false },
+      snfCowTable: { type: Boolean, default: false },
     },
     rateChartIds: {
       fatBufId: { type: Number, default: 0 },

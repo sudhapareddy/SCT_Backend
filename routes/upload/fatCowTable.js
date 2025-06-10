@@ -107,7 +107,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
               $set: {
                 "rateChartIds.fatCowId": fatCowId,
                 "effectiveDates.fatCowEffectiveDate": formattedDate,
-                isDeviceRateTable: true,
+                "isDeviceRateTable.fatCowTable": true,
               },
             }
           );
@@ -118,7 +118,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
               $set: {
                 "rateChartIds.fatCowId": fatCowId,
                 "effectiveDates.fatCowEffectiveDate": formattedDate,
-                isDeviceRateTable: false,
+                "isDeviceRateTable.fatCowTable": false,
               },
             }
           );

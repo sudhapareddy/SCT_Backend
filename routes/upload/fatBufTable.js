@@ -107,7 +107,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
               $set: {
                 "rateChartIds.fatBufId": fatBufId,
                 "effectiveDates.fatBufEffectiveDate": formattedDate,
-                isDeviceRateTable: true,
+                "isDeviceRateTable.fatBufTable": true,
               },
             }
           );
@@ -118,7 +118,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
               $set: {
                 "rateChartIds.fatBufId": fatBufId,
                 "effectiveDates.fatBufEffectiveDate": formattedDate,
-                isDeviceRateTable: false,
+                "isDeviceRateTable.fatBufTable": false,
               },
             }
           );
