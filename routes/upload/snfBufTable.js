@@ -124,6 +124,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
             $set: {
               "rateChartIds.snfBufId": snfBufId,
               "effectiveDates.snfBufEffectiveDate": formattedDate,
+              isDeviceRateTable: true,
             },
           });
         } else {
@@ -133,6 +134,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
               $set: {
                 "rateChartIds.snfBufId": snfBufId,
                 "effectiveDates.snfBufEffectiveDate": formattedDate,
+                isDeviceRateTable: false,
               },
             }
           );

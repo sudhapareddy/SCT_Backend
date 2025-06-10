@@ -61,7 +61,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
       deleteFile(filePath);
       return res.status(400).json({ error: "Missing deviceId" });
     }
-    queryFilter = { deviceid: user.deviceId };
+    queryFilter = { deviceid: user.deviceid };
   } else {
     if (!user.dairyCode) {
       deleteFile(filePath);
@@ -102,11 +102,12 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
         // Update rateChartIds and effective date
         if (user.role === "device") {
           await deviceModel.updateOne(
-            { deviceid: user.deviceId },
+            { deviceid: user.deviceid },
             {
               $set: {
                 "rateChartIds.fatBufId": fatBufId,
                 "effectiveDates.fatBufEffectiveDate": formattedDate,
+                isDeviceRateTable: true,
               },
             }
           );
@@ -117,6 +118,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
               $set: {
                 "rateChartIds.fatBufId": fatBufId,
                 "effectiveDates.fatBufEffectiveDate": formattedDate,
+                isDeviceRateTable: false,
               },
             }
           );
@@ -126,7 +128,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
 
         res.json({
           message: `Updated fatBufTable with ${fatBufRecords.length} records`,
-          updatedId: user.deviceId || user.dairyCode,
+          updatedId: user.deviceid || user.dairyCode,
           fatBufId,
           formattedDate,
         });

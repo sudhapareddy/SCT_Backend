@@ -61,8 +61,8 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "Missing deviceId in user info" });
     }
     collectionModel = deviceModel;
-    queryFilter = { deviceid: user.deviceId };
-    identifier = user.deviceId;
+    queryFilter = { deviceid: user.deviceid };
+    identifier = user.deviceid;
   } else {
     if (!user.dairyCode) {
       return res.status(400).json({ error: "Missing dairyCode in user info" });
@@ -102,11 +102,12 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
         // Update fatCowId in rateChartIds and fatCowEffectiveDate
         if (user.role === "device") {
           await deviceModel.updateOne(
-            { deviceid: user.deviceId },
+            { deviceid: user.deviceid },
             {
               $set: {
                 "rateChartIds.fatCowId": fatCowId,
                 "effectiveDates.fatCowEffectiveDate": formattedDate,
+                isDeviceRateTable: true,
               },
             }
           );
@@ -117,6 +118,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
               $set: {
                 "rateChartIds.fatCowId": fatCowId,
                 "effectiveDates.fatCowEffectiveDate": formattedDate,
+                isDeviceRateTable: false,
               },
             }
           );
