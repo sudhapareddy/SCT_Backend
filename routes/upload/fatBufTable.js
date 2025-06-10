@@ -37,6 +37,14 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
       .json({ error: "Missing fatBufEffectiveDate in request body" });
   }
 
+  const date = new Date(fatBufEffectiveDate);
+
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yy = String(date.getFullYear()).slice(-2);
+
+  const formattedDate = dd + mm + yy;
+
   if (!user || (user.role !== "dairy" && user.role !== "device")) {
     deleteFile(filePath);
     return res.status(403).json({ error: "Unauthorized user role" });
@@ -98,7 +106,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
             {
               $set: {
                 "rateChartIds.fatBufId": fatBufId,
-                "effectiveDates.fatBufEffectiveDate": fatBufEffectiveDate,
+                "effectiveDates.fatBufEffectiveDate": formattedDate,
               },
             }
           );
@@ -108,7 +116,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
             {
               $set: {
                 "rateChartIds.fatBufId": fatBufId,
-                "effectiveDates.fatBufEffectiveDate": fatBufEffectiveDate,
+                "effectiveDates.fatBufEffectiveDate": formattedDate,
               },
             }
           );
@@ -120,7 +128,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
           message: `Updated fatBufTable with ${fatBufRecords.length} records`,
           updatedId: user.deviceId || user.dairyCode,
           fatBufId,
-          fatBufEffectiveDate,
+          formattedDate,
         });
       } catch (err) {
         console.error("❌ Error updating fatBufTable:", err);
