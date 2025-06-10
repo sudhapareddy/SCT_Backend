@@ -4,10 +4,10 @@ const multer = require("multer");
 const csv = require("csv-parser");
 const fs = require("fs");
 const path = require("path");
-const mongoose = require("mongoose");
 
 const verifyToken = require("../../middlewares/authMiddleware");
-const deviceModel = require("../../models/DeviceModel"); // Import your model
+const deviceModel = require("../../models/DeviceModel");
+const dairyModel = require("../../models/DairyModel");
 
 const uploadsDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -23,25 +23,46 @@ const deleteFile = (filePath) => {
   });
 };
 
-router.post("/", upload.single("file"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
+router.post("/", verifyToken, upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   const filePath = req.file.path;
   const user = req.user;
+  const fatCowEffectiveDate = req.body?.fatCowEffectiveDate?.replace(/\//g, "");
 
-  // Ensure valid user role
+  if (!fatCowEffectiveDate) {
+    deleteFile(filePath);
+    return res
+      .status(400)
+      .json({ error: "Missing fatCowEffectiveDate in request body" });
+  }
+
   if (!user || (user.role !== "dairy" && user.role !== "device")) {
     deleteFile(filePath);
     return res.status(403).json({ error: "Unauthorized user role" });
   }
 
-  // Get deviceid from user info (adjust if needed)
-  const deviceid = user.deviceid;
-  if (!deviceid) {
-    deleteFile(filePath);
-    return res.status(400).json({ error: "Missing deviceid in user info" });
+  let collectionModel;
+  let queryFilter;
+  let identifier;
+  let dairyCodeForUpdate;
+
+  if (user.role === "device") {
+    if (!user.deviceid) {
+      deleteFile(filePath);
+      return res.status(400).json({ error: "Missing deviceId in user info" });
+    }
+    collectionModel = deviceModel;
+    queryFilter = { deviceid: user.deviceId };
+    identifier = user.deviceId;
+  } else {
+    if (!user.dairyCode) {
+      return res.status(400).json({ error: "Missing dairyCode in user info" });
+    }
+    collectionModel = dairyModel;
+    queryFilter = { dairyCode: user.dairyCode };
+    identifier = user.dairyCode;
+    dairyCodeForUpdate = user.dairyCode;
   }
 
   const fatCowRecords = [];
@@ -49,35 +70,60 @@ router.post("/", upload.single("file"), async (req, res) => {
   fs.createReadStream(filePath)
     .pipe(csv())
     .on("data", (row) => {
-      // Parse FAT and RATE as numbers
       const fat = parseFloat(row.FAT);
       const rate = parseFloat(row.RATE);
-
       if (!isNaN(fat) && !isNaN(rate)) {
         fatCowRecords.push({ FAT: fat, RATE: rate });
       }
     })
     .on("end", async () => {
       try {
-        // Update fatCowTable array in devicesList collection for this device
-        const updatedDoc = await deviceModel.findOneAndUpdate(
-          { deviceid: deviceid },
+        const fatCowId = Math.floor(1000 + Math.random() * 9000); // 4-digit random
+
+        const updatedDoc = await collectionModel.findOneAndUpdate(
+          queryFilter,
           { $set: { fatCowTable: fatCowRecords } },
           { new: true, upsert: false }
         );
 
-        deleteFile(filePath);
-
         if (!updatedDoc) {
-          return res.status(404).json({ error: "Device not found" });
+          deleteFile(filePath);
+          return res.status(404).json({ error: "Document not found" });
         }
 
+        // Update fatCowId in rateChartIds and fatCowEffectiveDate
+        if (user.role === "device") {
+          await deviceModel.updateOne(
+            { deviceid: user.deviceId },
+            {
+              $set: {
+                "rateChartIds.fatCowId": fatCowId,
+                "effectiveDates.fatCowEffectiveDate": fatCowEffectiveDate,
+              },
+            }
+          );
+        } else {
+          await deviceModel.updateMany(
+            { dairyCode: dairyCodeForUpdate },
+            {
+              $set: {
+                "rateChartIds.fatCowId": fatCowId,
+                "effectiveDates.fatCowEffectiveDate": fatCowEffectiveDate,
+              },
+            }
+          );
+        }
+
+        deleteFile(filePath);
+
         res.json({
-          message: `Updated fatCowTable with ${fatCowRecords.length} records for device ${deviceid}`,
-          updatedDeviceId: deviceid,
+          message: `Updated fatCowTable with ${fatCowRecords.length} records`,
+          updatedId: identifier,
+          fatCowId,
+          fatCowEffectiveDate,
         });
       } catch (err) {
-        console.error("Error updating fatCowTable:", err);
+        console.error("❌ Error updating fatCowTable:", err);
         deleteFile(filePath);
         res.status(500).json({ error: "Failed to update fatCowTable" });
       }

@@ -2,23 +2,41 @@ const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
 const csv = require("csv-parser");
-const mongoose = require("mongoose");
+const path = require("path");
+
 const verifyToken = require("../../middlewares/authMiddleware");
 const deviceModel = require("../../models/DeviceModel");
+const dairyModel = require("../../models/DairyModel");
 
 const router = express.Router();
-const upload = multer({ dest: "uploads/" });
+const uploadsDir = path.join(__dirname, "..", "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
 
-const deleteFile = (path) => {
-  fs.unlink(path, (err) => {
+const upload = multer({ dest: uploadsDir });
+
+const deleteFile = (filePath) => {
+  fs.unlink(filePath, (err) => {
     if (err) console.error("❌ Error deleting file:", err);
-    else console.log("✅ Temp file deleted:", path);
+    else console.log("✅ Temp file deleted:", filePath);
   });
 };
 
-router.post("/", upload.single("file"), async (req, res) => {
+router.post("/", verifyToken, upload.single("file"), async (req, res) => {
   const filePath = req.file?.path;
   if (!filePath) return res.status(400).json({ error: "No file uploaded" });
+
+  const snfBufEffectiveDate = req.body?.snfBufEffectiveDate;
+
+  if (!snfBufEffectiveDate) {
+    deleteFile(filePath);
+    return res
+      .status(400)
+      .json({ error: "Missing snfBufEffectiveDate in request body" });
+  }
+
+  const formattedDate = snfBufEffectiveDate.replace(/\//g, "");
 
   const user = req.user;
   if (!user || (user.role !== "dairy" && user.role !== "device")) {
@@ -26,8 +44,12 @@ router.post("/", upload.single("file"), async (req, res) => {
     return res.status(403).json({ error: "Unauthorized user" });
   }
 
-  const prefix = user.role === "dairy" ? user.dairyCode : user.deviceid;
-  const collectionName = `${prefix}_snfBufTable`;
+  const isDevice = user.role === "device";
+  const id = isDevice ? user.deviceid : user.dairyCode;
+  if (!id) {
+    deleteFile(filePath);
+    return res.status(400).json({ error: "Missing deviceId or dairyCode" });
+  }
 
   const results = [];
   let headers = [];
@@ -48,10 +70,7 @@ router.post("/", upload.single("file"), async (req, res) => {
           let fat = row[headers[0]]?.trim();
           if (!fat || isNaN(parseFloat(fat))) return;
 
-          // Normalize FAT key (e.g., 5 → 5.0)
-          if (!fat.includes(".")) {
-            fat = `${parseInt(fat)}.0`;
-          }
+          if (!fat.includes(".")) fat = `${parseInt(fat)}.0`;
 
           const nested = headers.slice(1).reduce((acc, col) => {
             const val = row[col];
@@ -63,7 +82,6 @@ router.post("/", upload.single("file"), async (req, res) => {
             return acc;
           }, []);
 
-          // Sort SNF keys inside each FAT group
           nested.sort((a, b) => {
             const aKey = parseFloat(Object.keys(a)[0]);
             const bKey = parseFloat(Object.keys(b)[0]);
@@ -73,49 +91,62 @@ router.post("/", upload.single("file"), async (req, res) => {
           dataMap.set(fat, nested);
         });
 
-        // Sort FAT keys
         const sortedMap = new Map(
           [...dataMap.entries()].sort(
             (a, b) => parseFloat(a[0]) - parseFloat(b[0])
           )
         );
 
-        // Convert to final object
         const sortedJson = {};
         for (const [numKey, value] of sortedMap) {
           sortedJson[numKey] = value;
         }
 
-        // Dynamic model for device/dairy
-        const DynamicModel = mongoose.model(
-          collectionName,
-          new mongoose.Schema({}, { strict: false }),
-          collectionName
-        );
+        const model = isDevice ? deviceModel : dairyModel;
+        const filter = isDevice ? { deviceid: id } : { dairyCode: id };
+        const snfBufId = Math.floor(1000 + Math.random() * 9000); // 4-digit random
 
-        await DynamicModel.deleteMany({});
-        const inserted = await DynamicModel.insertMany({ data: sortedJson });
+        const updateMain = await model.updateOne(filter, {
+          $set: {
+            snfBufTable: sortedJson,
+          },
+        });
 
-        // Update device's snfBufId
-        const deviceid = user.deviceid;
-        const rateChartId = Math.floor(1000 + Math.random() * 9000);
-
-        await deviceModel.updateOne(
-          { deviceid: deviceid },
-          { $set: { "rateChartIds.snfBufId": rateChartId } }
-        );
+        // Update rateChartIds and effectiveDates
+        if (isDevice) {
+          await deviceModel.updateOne(filter, {
+            $set: {
+              "rateChartIds.snfBufId": snfBufId,
+              "effectiveDates.snfBufEffectiveDate": formattedDate,
+            },
+          });
+        } else {
+          await deviceModel.updateMany(
+            { dairyCode: id },
+            {
+              $set: {
+                "rateChartIds.snfBufId": snfBufId,
+                "effectiveDates.snfBufEffectiveDate": formattedDate,
+              },
+            }
+          );
+        }
 
         deleteFile(filePath);
 
         res.status(200).json({
-          message: `Uploaded to ${collectionName}`,
-          id: inserted[0]._id,
-          data: inserted[0].data,
+          message: `Uploaded SNF Buf Table to ${
+            isDevice ? "device" : "dairy"
+          } ${id}`,
+          modifiedCount: updateMain.modifiedCount,
+          snfBufId,
+          formattedDate,
+          snfBufTable: sortedJson,
         });
       } catch (err) {
-        console.error("❌ MongoDB insert error:", err);
+        console.error("❌ MongoDB update error:", err);
         deleteFile(filePath);
-        res.status(500).json({ error: "Database insert failed" });
+        res.status(500).json({ error: "Database update failed" });
       }
     })
     .on("error", (err) => {

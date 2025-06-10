@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const serverSettingsSchema = new mongoose.Schema(
   {
     serverControl: { type: String, default: "N" },
@@ -18,83 +18,94 @@ const serverSettingsSchema = new mongoose.Schema(
     machineLock: { type: String, default: "N" },
     commissionType: { type: String, default: "N" },
     normalCommission: { type: String, default: "0.00" },
-    specialCommission: { type: [String], default: [] }
+    specialCommission: { type: [String], default: [] },
   },
   { _id: false }
 );
-const DeviceSchema = new mongoose.Schema({
-  deviceid: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  dairyCode: {
-    type: String,
-    required: true,
-    match: /^[A-Z]{3}$/,
-    unique: true
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    match: [/\S+@\S+\.\S+/, 'Please use a valid email address']
-  },
-  password: {
-    type: String,
-    required: true,
-    minlength: 6
-  },
-  status: {
-    type: String,
-    default: 'active'
-  },
-  role: {
-    type: String,
-    enum: ['device'],
-    default: 'device'
-  },
-  rateChartIds: {
-    fatBufId: { type: Number, default: 0 },
-    fatCowId: { type: Number, default: 0 },
-    snfBufId: { type: Number, default: 0 },
-    snfCowId: { type: Number, default: 0 },
-  },
-  effectiveDates: {
-    fatBufEffectiveDate: { type: String, default: "" },
-    fatCowEffectiveDate: { type: String, default: "" },
-    snfBufEffectiveDate: { type: String, default: "" },
-    snfCowEffectiveDate: { type: String, default: "" },
-  },
-  serverSettings: { type: serverSettingsSchema, default: {} },
-  fatCowTable: [
-    {
-      FAT: { type: Number, required: true },
-      RATE: { type: Number, required: true },
+const DeviceSchema = new mongoose.Schema(
+  {
+    deviceid: {
+      type: String,
+      required: true,
+      unique: true,
     },
-  ],
-  fatBufTable: [
-    {
-      FAT: { type: Number, required: true },
-      RATE: { type: Number, required: true },
+    dairyCode: {
+      type: String,
+      required: true,
+      match: /^[A-Z]{3}$/,
+      unique: true,
     },
-  ],
-  members: [
-    {
-      CODE: Number,
-      MILKTYPE: String,
-      COMMISSIONTYPE: String,
-      MEMBERNAME: String,
-      CONTACTNO: String,
-      STATUS: String,
-      createdOn: { type: Date, default: Date.now },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      match: [/\S+@\S+\.\S+/, "Please use a valid email address"],
     },
-  ],
-  createdAt: {
-    type: Date,
-    default: Date.now
+    password: {
+      type: String,
+      required: true,
+      minlength: 6,
+    },
+    status: {
+      type: String,
+      default: "active",
+    },
+    role: {
+      type: String,
+      enum: ["device"],
+      default: "device",
+    },
+    isDeviceRateTable: {
+      type: Boolean,
+      default: false, // or true, based on what you want
+    },
+    rateChartIds: {
+      fatBufId: { type: Number, default: 0 },
+      fatCowId: { type: Number, default: 0 },
+      snfBufId: { type: Number, default: 0 },
+      snfCowId: { type: Number, default: 0 },
+    },
+    effectiveDates: {
+      fatBufEffectiveDate: { type: String, default: "" },
+      fatCowEffectiveDate: { type: String, default: "" },
+      snfBufEffectiveDate: { type: String, default: "" },
+      snfCowEffectiveDate: { type: String, default: "" },
+    },
+    serverSettings: { type: serverSettingsSchema, default: {} },
+    fatCowTable: [
+      {
+        FAT: { type: Number, required: true },
+        RATE: { type: Number, required: true },
+      },
+    ],
+    fatBufTable: [
+      {
+        FAT: { type: Number, required: true },
+        RATE: { type: Number, required: true },
+      },
+    ],
+    snfCowTable: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+    snfBufTable: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+    members: [
+      {
+        CODE: Number,
+        MILKTYPE: String,
+        COMMISSIONTYPE: String,
+        MEMBERNAME: String,
+        CONTACTNO: String,
+        STATUS: String,
+        createdOn: { type: Date, default: Date.now },
+      },
+    ],
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  {
+    minimize: false, // 🔑 ensures empty objects like {} are saved
   }
-});
+);
 
-module.exports = mongoose.model('Device', DeviceSchema, 'devicesList');
+module.exports = mongoose.model("Device", DeviceSchema, "devicesList");
