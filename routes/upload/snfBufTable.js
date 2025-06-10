@@ -37,7 +37,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
 
   const formattedDate = dd + mm + yy;
 
-  if (!formattedDate) {
+  if (!snfBufEffectiveDate) {
     deleteFile(filePath);
     return res
       .status(400)

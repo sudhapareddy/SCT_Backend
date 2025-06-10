@@ -45,7 +45,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
   const results = [];
   let headers = [];
 
-  const effectiveDate = req.body.snfCowEffectiveDate;
+  const snfCowEffectiveDate = req.body.snfCowEffectiveDate;
 
   const date = new Date(effectiveDate);
 
@@ -55,9 +55,11 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
 
   const formattedDate = dd + mm + yy;
 
-  if (!formattedDate) {
+  if (!snfCowEffectiveDate) {
     deleteFile(filePath);
-    return res.status(400).json({ error: "Invalid or missing effective date" });
+    return res
+      .status(400)
+      .json({ error: "Invalid or missing snfCowEffectiveDate" });
   }
 
   fs.createReadStream(filePath)
