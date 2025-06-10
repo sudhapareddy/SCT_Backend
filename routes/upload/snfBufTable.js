@@ -29,14 +29,20 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
 
   const snfBufEffectiveDate = req.body?.snfBufEffectiveDate;
 
-  if (!snfBufEffectiveDate) {
+  const date = new Date(snfBufEffectiveDate);
+
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yy = String(date.getFullYear()).slice(-2);
+
+  const formattedDate = dd + mm + yy;
+
+  if (!formattedDate) {
     deleteFile(filePath);
     return res
       .status(400)
       .json({ error: "Missing snfBufEffectiveDate in request body" });
   }
-
-  const formattedDate = snfBufEffectiveDate.replace(/\//g, "");
 
   const user = req.user;
   if (!user || (user.role !== "dairy" && user.role !== "device")) {

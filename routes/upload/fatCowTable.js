@@ -28,9 +28,17 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
 
   const filePath = req.file.path;
   const user = req.user;
-  const fatCowEffectiveDate = req.body?.fatCowEffectiveDate?.replace(/\//g, "");
+  const fatCowEffectiveDate = req.body?.fatCowEffectiveDate;
 
-  if (!fatCowEffectiveDate) {
+  const date = new Date(fatCowEffectiveDate);
+
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yy = String(date.getFullYear()).slice(-2);
+
+  const formattedDate = dd + mm + yy;
+
+  if (!formattedDate) {
     deleteFile(filePath);
     return res
       .status(400)
@@ -98,7 +106,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
             {
               $set: {
                 "rateChartIds.fatCowId": fatCowId,
-                "effectiveDates.fatCowEffectiveDate": fatCowEffectiveDate,
+                "effectiveDates.fatCowEffectiveDate": formattedDate,
               },
             }
           );
@@ -108,7 +116,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
             {
               $set: {
                 "rateChartIds.fatCowId": fatCowId,
-                "effectiveDates.fatCowEffectiveDate": fatCowEffectiveDate,
+                "effectiveDates.fatCowEffectiveDate": formattedDate,
               },
             }
           );
@@ -120,7 +128,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
           message: `Updated fatCowTable with ${fatCowRecords.length} records`,
           updatedId: identifier,
           fatCowId,
-          fatCowEffectiveDate,
+          formattedDate,
         });
       } catch (err) {
         console.error("❌ Error updating fatCowTable:", err);

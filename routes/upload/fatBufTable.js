@@ -38,9 +38,7 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
 
   const formattedDate = dd + mm + yy;
 
-  console.log(fatBufEffectiveDate, formattedDate); // Output: "100625"
-
-  if (!fatBufEffectiveDate) {
+  if (!formattedDate) {
     deleteFile(filePath);
     return res
       .status(400)

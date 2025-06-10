@@ -47,12 +47,19 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
 
   const effectiveDate = req.body.snfCowEffectiveDate;
 
-  if (!effectiveDate || !/^\d{2}\/\d{2}\/\d{2}$/.test(effectiveDate)) {
+  
+  const date = new Date(effectiveDate);
+
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yy = String(date.getFullYear()).slice(-2);
+
+  const formattedDate = dd + mm + yy;
+
+  if (!formattedDate)) {
     deleteFile(filePath);
     return res.status(400).json({ error: "Invalid or missing effective date" });
   }
-
-  const formattedDate = effectiveDate.replace(/\//g, "");
 
   fs.createReadStream(filePath)
     .pipe(csv())
