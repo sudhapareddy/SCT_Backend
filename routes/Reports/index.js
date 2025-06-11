@@ -22,8 +22,8 @@ router.use(
 );
 router.use(
   "/datewise-report",
-  // verifyToken,
-  // authorizeRoles("admin", "dairy", "device"),
+  verifyToken,
+  authorizeRoles("admin", "dairy", "device"),
   datewiseMultipleReport
 );
 
@@ -36,15 +36,15 @@ router.use(
 
 router.use(
   "/absent-members-report",
-  //   verifyToken,
-  //   authorizeRoles("admin", "dairy", "device"),
+  verifyToken,
+  authorizeRoles("admin", "dairy", "device"),
   absentReport
 );
 
 router.use(
   "/cumulative-report",
-  //   verifyToken,
-  //   authorizeRoles("admin", "dairy", "device"),
+  verifyToken,
+  authorizeRoles("admin", "dairy", "device"),
   cumulativeReport
 );
 
