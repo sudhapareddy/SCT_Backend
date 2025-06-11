@@ -1,70 +1,93 @@
-const express = require('express');
-const Record = require('../../models/RecordModel');
+const express = require("express");
+const Record = require("../../models/RecordModel");
 const router = express.Router();
 
-router.get('/', async (req, res) => {
+router.get("/", async (req, res) => {
   const { deviceCode, date, shift } = req.query;
 
   if (!deviceCode || !date) {
-    return res.status(400).json({ error: 'Device code and date are required.' });
+    return res
+      .status(400)
+      .json({ error: "Device code and date are required." });
   }
 
-  // Build match condition based on shift presence
   const matchCondition = {
     DEVICEID: deviceCode,
     SAMPLEDATE: date,
-    ...(shift ? { SHIFT: shift } : {})
+    ...(shift ? { SHIFT: shift } : {}),
   };
 
   try {
-    // Aggregation for totals
     let totals = await Record.aggregate([
       { $match: matchCondition },
       {
-        $addFields: {
-          AMOUNT: { $multiply: ["$QTY", "$RATE"] }
-        }
-      },
-      {
         $group: {
-          _id: { device: "$DEVICEID", date: "$SAMPLEDATE", milkType: "$MILKTYPE" },
+          _id: {
+            device: "$DEVICEID",
+            date: "$SAMPLEDATE",
+            milkType: "$MILKTYPE",
+          },
           totalQuantity: { $sum: "$QTY" },
-          totalAmount: { $sum: "$AMOUNT" },
+          totalAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
           totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
           averageFat: { $avg: "$FAT" },
           averageSNF: { $avg: "$SNF" },
-          averageRate: { $avg: "$RATE" },
-          totalRecords: { $sum: 1 }
-        }
+          weightedRateAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
+          totalRecords: { $sum: 1 },
+        },
+      },
+      {
+        $addFields: {
+          averageRate: {
+            $cond: [
+              { $gt: ["$totalQuantity", 0] },
+              { $divide: ["$weightedRateAmount", "$totalQuantity"] },
+              0,
+            ],
+          },
+        },
       },
       {
         $unionWith: {
-          coll: 'records',
+          coll: "records",
           pipeline: [
             { $match: matchCondition },
-            { $addFields: { AMOUNT: { $multiply: ["$QTY", "$RATE"] } } },
             {
               $group: {
-                _id: { device: "$DEVICEID", date: "$SAMPLEDATE", milkType: "TOTAL" },
+                _id: {
+                  device: "$DEVICEID",
+                  date: "$SAMPLEDATE",
+                  milkType: "TOTAL",
+                },
                 totalQuantity: { $sum: "$QTY" },
-                totalAmount: { $sum: "$AMOUNT" },
+                totalAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
                 totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
                 averageFat: { $avg: "$FAT" },
                 averageSNF: { $avg: "$SNF" },
-                averageRate: { $avg: "$RATE" },
-                totalRecords: { $sum: 1 }
-              }
-            }
-          ]
-        }
+                weightedRateAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
+                totalRecords: { $sum: 1 },
+              },
+            },
+            {
+              $addFields: {
+                averageRate: {
+                  $cond: [
+                    { $gt: ["$totalQuantity", 0] },
+                    { $divide: ["$weightedRateAmount", "$totalQuantity"] },
+                    0,
+                  ],
+                },
+              },
+            },
+          ],
+        },
       },
-      { $sort: { "_id.milkType": 1 } }
+      { $sort: { "_id.milkType": 1 } },
     ]);
 
-    // Ensure COW, BUF, TOTAL always exist
-    const milkTypes = ['COW', 'BUF', 'TOTAL'];
-    milkTypes.forEach(type => {
-      if (!totals.find(t => t._id.milkType === type)) {
+    const milkTypes = ["COW", "BUF", "TOTAL"];
+    milkTypes.forEach((type) => {
+      if (!totals.find((t) => t._id.milkType === type)) {
         totals.push({
           _id: { device: deviceCode, date, milkType: type },
           totalQuantity: 0,
@@ -73,23 +96,25 @@ router.get('/', async (req, res) => {
           averageFat: 0,
           averageSNF: 0,
           averageRate: 0,
-          totalRecords: 0
+          totalRecords: 0,
         });
       }
     });
 
-    // Format averages and sort by milk type
-    totals.sort((a, b) => milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType));
-    totals = totals.map(item => ({
+    totals.sort(
+      (a, b) =>
+        milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType)
+    );
+
+    totals = totals.map((item) => ({
       ...item,
-      averageFat: item.averageFat ? item.averageFat.toFixed(1) : 0,
-      averageSNF: item.averageSNF ? item.averageSNF.toFixed(1) : 0,
-      averageRate: item.averageRate ? item.averageRate.toFixed(2) : 0
+      averageFat: item.averageFat ? item.averageFat.toFixed(1) : "0.0",
+      averageSNF: item.averageSNF ? item.averageSNF.toFixed(1) : "0.0",
+      averageRate: item.averageRate ? item.averageRate.toFixed(2) : "0.00",
     }));
 
-    // Fetch records and enrich with AMOUNT and TOTAL
     const records = await Record.find(matchCondition);
-    const enrichedRecords = records.map(r => {
+    const enrichedRecords = records.map((r) => {
       const amount = (r.RATE || 0) * (r.QTY || 0);
       const total = amount + (r.INCENTIVEAMOUNT || 0);
       return {
@@ -100,13 +125,22 @@ router.get('/', async (req, res) => {
     });
 
     if (totals.length === 0 && records.length === 0) {
-      return res.status(404).json({ error: 'No records found for the given device code and date.' });
+      return res
+        .status(404)
+        .json({
+          error: "No records found for the given device code and date.",
+        });
     }
 
     return res.json({ totals, records: enrichedRecords });
   } catch (err) {
-    console.error('Error generating report:', err);
-    res.status(500).json({ error: err.message || 'Internal server error', stack: err.stack });
+    console.error("Error generating report:", err);
+    res
+      .status(500)
+      .json({
+        error: err.message || "Internal server error",
+        stack: err.stack,
+      });
   }
 });
 
