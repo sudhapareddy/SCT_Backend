@@ -22,8 +22,8 @@ router.use(
 );
 router.use(
   "/datewise-report",
-  verifyToken,
-  authorizeRoles("admin", "dairy", "device"),
+  // verifyToken,
+  // authorizeRoles("admin", "dairy", "device"),
   datewiseMultipleReport
 );
 
