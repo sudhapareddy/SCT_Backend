@@ -4,7 +4,6 @@ const fs = require("fs");
 const csv = require("csv-parser");
 const path = require("path");
 
-const verifyToken = require("../../middlewares/authMiddleware");
 const deviceModel = require("../../models/DeviceModel");
 const dairyModel = require("../../models/DairyModel");
 
@@ -23,7 +22,7 @@ const deleteFile = (filePath) => {
   });
 };
 
-router.post("/", verifyToken, upload.single("file"), async (req, res) => {
+router.post("/", upload.single("file"), async (req, res) => {
   const filePath = req.file?.path;
   if (!filePath) return res.status(400).json({ error: "No file uploaded" });
 
@@ -143,9 +142,8 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
         deleteFile(filePath);
 
         res.status(200).json({
-          message: `Uploaded SNF Buf Table to ${
-            isDevice ? "device" : "dairy"
-          } ${id}`,
+          message: `Uploaded SNF Buf Table to ${isDevice ? "device" : "dairy"
+            } ${id}`,
           modifiedCount: updateMain.modifiedCount,
           snfBufId,
           formattedDate,

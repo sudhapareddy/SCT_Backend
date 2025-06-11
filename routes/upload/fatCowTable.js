@@ -5,7 +5,6 @@ const csv = require("csv-parser");
 const fs = require("fs");
 const path = require("path");
 
-const verifyToken = require("../../middlewares/authMiddleware");
 const deviceModel = require("../../models/DeviceModel");
 const dairyModel = require("../../models/DairyModel");
 
@@ -23,7 +22,7 @@ const deleteFile = (filePath) => {
   });
 };
 
-router.post("/", verifyToken, upload.single("file"), async (req, res) => {
+router.post("/", upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   const filePath = req.file.path;
