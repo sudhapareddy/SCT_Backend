@@ -13,6 +13,8 @@ const authorizeRoles = require("../../middlewares/authorizeRoles");
 // Apply verifyToken middleware for all device routes
 //router.use(verifyToken);
 const cumulativeReport = require("./cumulativeReport");
+const datewiseDetailedReport = require("./datewiseDetailedReport");
+const datewiseSummaryReport = require("./datewiseSummaryReport");
 
 router.use(
   "/datewise-report",
@@ -46,6 +48,20 @@ router.use(
   verifyToken,
   authorizeRoles("admin", "dairy", "device"),
   cumulativeReport
+);
+
+router.use(
+  "/datewise-detailed-report",
+  //verifyToken,
+  //authorizeRoles("admin", "dairy", "device"),
+  datewiseDetailedReport
+);
+
+router.use(
+  "/datewise-summary-report",
+  //verifyToken,
+  //authorizeRoles("admin", "dairy", "device"),
+  datewiseSummaryReport
 );
 
 module.exports = router;
