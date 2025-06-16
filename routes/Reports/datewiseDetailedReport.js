@@ -212,7 +212,7 @@ router.get("/", async (req, res) => {
       },
     ]);
 
-    // ========== 3. Merge ==========
+    // ========== 3. Merge & Final Sort ==========
     const merged = summaryData.map((summary) => {
       const matchedRecords = rawRecords.find(
         (r) => r._id.date === summary.date && r._id.shift === summary.shift
@@ -221,6 +221,13 @@ router.get("/", async (req, res) => {
         ...summary,
         records: matchedRecords?.records || [],
       };
+    });
+
+    // Sort final merged result by parsedDate and shift
+    merged.sort((a, b) => {
+      const dateDiff = new Date(a.parsedDate) - new Date(b.parsedDate);
+      if (dateDiff !== 0) return dateDiff;
+      return a.shift.localeCompare(b.shift); // e.g. MORNING before EVENING
     });
 
     res.json({

@@ -38,6 +38,7 @@ router.get("/", async (req, res) => {
     const parsedFrom = new Date(fromDate.split("/").reverse().join("-"));
     const parsedTo = new Date(toDate.split("/").reverse().join("-"));
 
+    // ========== Shared Base Pipeline ==========
     const pipelineBase = [
       {
         $addFields: {
@@ -145,17 +146,17 @@ router.get("/", async (req, res) => {
           },
         },
       },
-      { $sort: { date: 1 } },
     ];
 
-    // Clone the base pipeline for counting total records
+    // ========== Count Total (Before Pagination) ==========
     const countPipeline = [...pipelineBase, { $count: "totalCount" }];
     const [countResult] = await Record.aggregate(countPipeline);
     const totalCount = countResult?.totalCount || 0;
 
-    // Add pagination steps to the base pipeline
+    // ========== Paginated Results ==========
     const paginatedPipeline = [
       ...pipelineBase,
+      { $sort: { parsedDate: 1 } },
       { $skip: skip },
       { $limit: limitInt },
     ];
