@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
 
-const Device = require("../../models/DeviceModel"); // devicesList
-const Record = require("../../models/RecordModel"); // your milk records model
+const Device = require("../../models/DeviceModel");
+const Record = require("../../models/RecordModel");
 
-// GET /api/reports/absent-members-report?deviceid=SCT1234&date=28/05/2025&shift=EVENING
+// GET /api/reports/absent-members-report?deviceid=SCT1234&date=28/05/2025&shift=EVENING&page=1&limit=10
 router.get("/", async (req, res) => {
-  const { deviceid, date, shift } = req.query;
+  const { deviceid, date, shift, page = 1, limit = 10 } = req.query;
 
   if (!deviceid || !date || !shift) {
     return res
@@ -14,17 +14,22 @@ router.get("/", async (req, res) => {
       .json({ error: "deviceid, date, and shift are required" });
   }
 
-  try {
-    // 1. Get device and its members
-    const device = await Device.findOne({ deviceid });
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
 
+  if (isNaN(pageNum) || pageNum <= 0 || isNaN(limitNum) || limitNum <= 0) {
+    return res.status(400).json({ error: "Invalid page or limit value" });
+  }
+
+  try {
+    // 1. Get device and all members
+    const device = await Device.findOne({ deviceid });
     if (!device) {
       return res.status(404).json({ error: "Device not found" });
     }
-
     const allMembers = device.members || [];
 
-    // 2. Get present records from `records` collection
+    // 2. Get present records
     const presentRecords = await Record.find({
       DEVICEID: deviceid,
       SAMPLEDATE: date,
@@ -33,8 +38,8 @@ router.get("/", async (req, res) => {
 
     const presentCodes = presentRecords.map((r) => r.CODE);
 
-    // 3. Filter absent members with required fields only
-    const absentMembers = allMembers
+    // 3. Compute absent list
+    const absentMembersAll = allMembers
       .filter((m) => !presentCodes.includes(m.CODE))
       .map(({ CODE, MILKTYPE, MEMBERNAME }) => ({
         CODE,
@@ -42,22 +47,31 @@ router.get("/", async (req, res) => {
         MEMBERNAME,
       }));
 
-    // 4. Count milk types (normalize case)
-    const cowAbsentCount = absentMembers.filter(
+    // 4. Milk type count
+    const cowAbsentCount = absentMembersAll.filter(
       (m) => m.MILKTYPE?.toUpperCase() === "C"
     ).length;
 
-    const bufAbsentCount = absentMembers.filter(
+    const bufAbsentCount = absentMembersAll.filter(
       (m) => m.MILKTYPE?.toUpperCase() === "B"
     ).length;
 
+    // 5. Pagination
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginatedAbsent = absentMembersAll.slice(startIndex, startIndex + limitNum);
+
+    // 6. Return result
     res.json({
       totalMembers: allMembers.length,
       presentCount: presentCodes.length,
-      absentCount: absentMembers.length,
+      absentCount: absentMembersAll.length,
+      totalRecords: absentMembersAll.length,
       cowAbsentCount,
       bufAbsentCount,
-      absentMembers,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(absentMembersAll.length / limitNum),
+      absentMembers: paginatedAbsent,
     });
   } catch (error) {
     console.error("Error fetching absent members:", error);

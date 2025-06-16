@@ -3,11 +3,16 @@ const Record = require('../../models/RecordModel');
 const router = express.Router();
 
 router.get('/', async (req, res) => {
-  const { deviceCode, memberCode, fromDate, toDate } = req.query;
+  const { deviceCode, memberCode, fromDate, toDate, page = 1, limit = 10 } = req.query;
 
   if (!deviceCode || !memberCode || !fromDate || !toDate) {
-    return res.status(400).json({ error: 'Device code, member code, fromDate, and toDate are required.' });
+    return res.status(400).json({
+      error: 'Device code, member code, fromDate, and toDate are required.',
+    });
   }
+
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
 
   try {
     let totals = await Record.aggregate([
@@ -75,6 +80,7 @@ router.get('/', async (req, res) => {
       { $sort: { "_id.milkType": 1 } }
     ]);
 
+    // Ensure fixed structure (COW, BUF, TOTAL)
     const milkTypes = ['COW', 'BUF', 'TOTAL'];
     milkTypes.forEach(type => {
       if (!totals.find(t => t._id.milkType === type)) {
@@ -93,7 +99,6 @@ router.get('/', async (req, res) => {
 
     totals.sort((a, b) => milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType));
 
-    // Round averages
     totals = totals.map(item => ({
       ...item,
       averageFat: item.averageFat ? item.averageFat.toFixed(1) : "0.0",
@@ -104,8 +109,8 @@ router.get('/', async (req, res) => {
       totalIncentive: item.totalIncentive?.toFixed(2) || "0.00"
     }));
 
-    // Fetch and enrich records
-    const records = await Record.aggregate([
+    // Fetch records
+    const allRecords = await Record.aggregate([
       {
         $addFields: {
           parsedDate: {
@@ -123,24 +128,39 @@ router.get('/', async (req, res) => {
       { $sort: { parsedDate: 1 } }
     ]);
 
-    const enrichedRecords = records.map(record => {
+    const enrichedRecords = allRecords.map(record => {
       const amount = (record.QTY || 0) * (record.RATE || 0);
       const incentive = record.INCENTIVEAMOUNT || 0;
       return {
         ...record,
         AMOUNT: amount,
-        TOTAL: (amount + incentive),
+        TOTAL: amount + incentive,
       };
     });
 
-    if (totals.length === 0 && enrichedRecords.length === 0) {
+    // Slice for pagination
+    const totalRecords = enrichedRecords.length;
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginatedRecords = enrichedRecords.slice(startIndex, startIndex + limitNum);
+
+    if (totals.length === 0 && totalRecords === 0) {
       return res.status(404).json({ error: 'No records found for the given criteria.' });
     }
 
-    res.json({ totals, records: enrichedRecords });
+    res.json({
+      totals,
+      records: paginatedRecords,
+      page: pageNum,
+      limit: limitNum,
+      totalRecords,
+      totalPages: Math.ceil(totalRecords / limitNum),
+    });
   } catch (err) {
     console.error('Error generating codewise report:', err);
-    res.status(500).json({ error: err.message || 'Internal server error', stack: err.stack });
+    res.status(500).json({
+      error: err.message || 'Internal server error',
+      stack: err.stack
+    });
   }
 });
 

@@ -52,15 +52,15 @@ router.use(
 
 router.use(
   "/datewise-detailed-report",
-  //verifyToken,
-  //authorizeRoles("admin", "dairy", "device"),
+  verifyToken,
+  authorizeRoles("admin", "dairy", "device"),
   datewiseDetailedReport
 );
 
 router.use(
   "/datewise-summary-report",
-  //verifyToken,
-  //authorizeRoles("admin", "dairy", "device"),
+  verifyToken,
+  authorizeRoles("admin", "dairy", "device"),
   datewiseSummaryReport
 );
 

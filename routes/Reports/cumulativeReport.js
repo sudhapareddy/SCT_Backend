@@ -4,7 +4,7 @@ const router = express.Router();
 const Record = require("../../models/RecordModel");
 
 router.get("/", async (req, res) => {
-  const { deviceid, fromDate, toDate, fromCode, toCode } = req.query;
+  const { deviceid, fromDate, toDate, fromCode, toCode, page = 1, limit = 10 } = req.query;
 
   if (!deviceid || !fromDate || !toDate || !fromCode || !toCode) {
     return res.status(400).json({
@@ -15,6 +15,9 @@ router.get("/", async (req, res) => {
   try {
     const fromCodeNum = parseInt(fromCode);
     const toCodeNum = parseInt(toCode);
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
     const from = moment(fromDate, "DD/MM/YYYY");
     const to = moment(toDate, "DD/MM/YYYY");
 
@@ -42,7 +45,6 @@ router.get("/", async (req, res) => {
       const rate = rec.RATE || 0;
       const incentive = rec.INCENTIVEAMOUNT || 0;
 
-      // Per CODE + MILKTYPE
       if (!resultMap[key]) {
         resultMap[key] = {
           CODE: code,
@@ -56,7 +58,6 @@ router.get("/", async (req, res) => {
       resultMap[key].totalAmount += qty * rate;
       resultMap[key].totalIncentive += incentive;
 
-      // Per MILKTYPE totals
       if (!milkTypeTotals[milkType]) {
         milkTypeTotals[milkType] = {
           MILKTYPE: milkType,
@@ -71,27 +72,22 @@ router.get("/", async (req, res) => {
       milkTypeTotals[milkType].totalIncentive += incentive;
       milkTypeTotals[milkType].memberCount.add(code);
 
-      // Grand totals
       grandTotalQty += qty;
       grandTotalAmount += qty * rate;
       grandTotalIncentive += incentive;
     }
 
-    // Format per-member list with grandTotal
     const finalList = Object.values(resultMap)
       .map((item) => {
-        const avgRate =
-          item.totalQty > 0 ? item.totalAmount / item.totalQty : 0;
-        const totalAmount = item.totalAmount;
-        const totalIncentive = item.totalIncentive;
+        const avgRate = item.totalQty > 0 ? item.totalAmount / item.totalQty : 0;
         return {
           CODE: item.CODE,
           MILKTYPE: item.MILKTYPE,
           totalQty: item.totalQty.toFixed(2),
           avgRate: avgRate.toFixed(2),
-          totalIncentive: totalIncentive.toFixed(2),
-          totalAmount: totalAmount.toFixed(2),
-          grandTotal: (totalAmount + totalIncentive).toFixed(2), // ✅ here
+          totalIncentive: item.totalIncentive.toFixed(2),
+          totalAmount: item.totalAmount.toFixed(2),
+          grandTotal: (item.totalAmount + item.totalIncentive).toFixed(2),
         };
       })
       .sort((a, b) => {
@@ -99,28 +95,34 @@ router.get("/", async (req, res) => {
         return a.MILKTYPE.localeCompare(b.MILKTYPE);
       });
 
-    // Format milk type totals with grandTotal
+    const totalRecords = finalList.length;
+    const paginatedList = finalList.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
     const milkTypeSummary = Object.values(milkTypeTotals).map((item) => {
-      const totalAmount = item.totalAmount;
-      const totalIncentive = item.totalIncentive;
       return {
-        memberCount: item.memberCount.size,
         MILKTYPE: item.MILKTYPE,
+        memberCount: item.memberCount.size,
         totalQty: item.totalQty.toFixed(2),
-        totalAmount: totalAmount.toFixed(2),
-        totalIncentive: totalIncentive.toFixed(2),
-        grandTotal: (totalAmount + totalIncentive).toFixed(2), // ✅ here
+        totalAmount: item.totalAmount.toFixed(2),
+        totalIncentive: item.totalIncentive.toFixed(2),
+        grandTotal: (item.totalAmount + item.totalIncentive).toFixed(2),
       };
     });
 
     res.json({
-      data: finalList,
+      data: paginatedList,
       milkTypeTotals: milkTypeSummary,
-      totalMembers: finalList.length,
+      totalMembers: totalRecords,
       grandTotalQty: grandTotalQty.toFixed(2),
       grandTotalIncentive: grandTotalIncentive.toFixed(2),
       grandTotalAmount: grandTotalAmount.toFixed(2),
-      grandTotal: (grandTotalAmount + grandTotalIncentive).toFixed(2), // ✅ here
+      grandTotal: (grandTotalAmount + grandTotalIncentive).toFixed(2),
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalRecords: totalRecords,
+        totalPages: Math.ceil(totalRecords / limitNum),
+      },
     });
   } catch (error) {
     console.error("Cumulative report error:", error);

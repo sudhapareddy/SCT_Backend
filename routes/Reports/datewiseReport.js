@@ -3,7 +3,7 @@ const Record = require("../../models/RecordModel");
 const router = express.Router();
 
 router.get("/", async (req, res) => {
-  const { deviceCode, date, shift } = req.query;
+  const { deviceCode, date, shift, page = 1, limit = 20 } = req.query;
 
   if (!deviceCode || !date) {
     return res
@@ -113,7 +113,17 @@ router.get("/", async (req, res) => {
       averageRate: item.averageRate ? item.averageRate.toFixed(2) : "0.00",
     }));
 
-    const records = await Record.find(matchCondition);
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const totalRecordsCount = await Record.countDocuments(matchCondition);
+
+    const records = await Record.find(matchCondition)
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ CREATEDAT: -1 }); // optional: adjust sort
+
     const enrichedRecords = records.map((r) => {
       const amount = (r.RATE || 0) * (r.QTY || 0);
       const total = amount + (r.INCENTIVEAMOUNT || 0);
@@ -125,22 +135,27 @@ router.get("/", async (req, res) => {
     });
 
     if (totals.length === 0 && records.length === 0) {
-      return res
-        .status(404)
-        .json({
-          error: "No records found for the given device code and date.",
-        });
+      return res.status(404).json({
+        error: "No records found for the given device code and date.",
+      });
     }
 
-    return res.json({ totals, records: enrichedRecords });
+    return res.json({
+      totals,
+      records: enrichedRecords,
+      pagination: {
+        totalRecords: totalRecordsCount,
+        page: pageNumber,
+        limit: pageSize,
+        totalPages: Math.ceil(totalRecordsCount / pageSize),
+      },
+    });
   } catch (err) {
     console.error("Error generating report:", err);
-    res
-      .status(500)
-      .json({
-        error: err.message || "Internal server error",
-        stack: err.stack,
-      });
+    res.status(500).json({
+      error: err.message || "Internal server error",
+      stack: err.stack,
+    });
   }
 });
 

@@ -38,7 +38,7 @@ router.get("/", async (req, res) => {
     const parsedFrom = new Date(fromDate.split("/").reverse().join("-"));
     const parsedTo = new Date(toDate.split("/").reverse().join("-"));
 
-    const pipeline = [
+    const pipelineBase = [
       {
         $addFields: {
           parsedDate: {
@@ -143,16 +143,27 @@ router.get("/", async (req, res) => {
         },
       },
       { $sort: { date: 1 } },
+    ];
+
+    // Clone the base pipeline for counting total records
+    const countPipeline = [...pipelineBase, { $count: "totalCount" }];
+    const [countResult] = await Record.aggregate(countPipeline);
+    const totalCount = countResult?.totalCount || 0;
+
+    // Add pagination steps to the base pipeline
+    const paginatedPipeline = [
+      ...pipelineBase,
       { $skip: skip },
       { $limit: limitInt },
     ];
 
-    const results = await Record.aggregate(pipeline);
+    const results = await Record.aggregate(paginatedPipeline);
 
     res.json({
       page: pageInt,
       limit: limitInt,
-      count: results.length,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limitInt),
       data: results,
     });
   } catch (err) {
