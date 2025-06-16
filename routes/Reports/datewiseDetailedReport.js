@@ -26,8 +26,6 @@ router.get("/", async (req, res) => {
   const skip = (pageInt - 1) * limitInt;
 
   try {
-    const parsedFrom = new Date(fromDate.split("/").reverse().join("-"));
-    const parsedTo = new Date(toDate.split("/").reverse().join("-"));
     const baseMatch = {
       DEVICEID: deviceId,
       CODE: { $gte: parseInt(fromCode), $lte: parseInt(toCode) },
@@ -37,7 +35,10 @@ router.get("/", async (req, res) => {
       baseMatch.SHIFT = shift.toUpperCase();
     }
 
-    // ---------- Summary Pipeline ----------
+    const parsedFrom = new Date(fromDate.split("/").reverse().join("-"));
+    const parsedTo = new Date(toDate.split("/").reverse().join("-"));
+
+    // ========== 1. Summary Pipeline ==========
     const summaryPipeline = [
       {
         $addFields: {
@@ -150,10 +151,10 @@ router.get("/", async (req, res) => {
       { $limit: limitInt },
     ];
 
-    const summary = await Record.aggregate(summaryPipeline);
+    const summaryData = await Record.aggregate(summaryPipeline);
 
-    // ---------- Raw Records ----------
-    const recordPipeline = [
+    // ========== 2. Raw Grouped Records ==========
+    const rawRecords = await Record.aggregate([
       {
         $addFields: {
           parsedDate: {
@@ -172,34 +173,52 @@ router.get("/", async (req, res) => {
           parsedDate: { $gte: parsedFrom, $lte: parsedTo },
         },
       },
-      { $sort: { parsedDate: 1, SAMPLETIME: 1 } },
-      { $skip: skip },
-      { $limit: limitInt },
-    ];
+      {
+        $sort: { parsedDate: 1, SAMPLETIME: 1 },
+      },
+      {
+        $group: {
+          _id: {
+            date: "$SAMPLEDATE",
+            shift: "$SHIFT",
+          },
+          records: {
+            $push: {
+              DEVICEID: "$DEVICEID",
+              CODE: "$CODE",
+              SAMPLEDATE: "$SAMPLEDATE",
+              SHIFT: "$SHIFT",
+              MILKTYPE: "$MILKTYPE",
+              FAT: { $round: ["$FAT", 1] },
+              SNF: { $round: ["$SNF", 1] },
+              RATE: { $round: ["$RATE", 2] },
+              QTY: { $round: ["$QTY", 2] },
+              INCENTIVEAMOUNT: { $round: ["$INCENTIVEAMOUNT", 2] },
+              TOTALAMOUNT: {
+                $round: [{ $multiply: ["$QTY", "$RATE"] }, 2],
+              },
+            },
+          },
+        },
+      },
+    ]);
 
-    const recordsRaw = await Record.aggregate(recordPipeline);
-
-    const formattedRecords = recordsRaw.map((r) => ({
-      DEVICEID: r.DEVICEID,
-      CODE: r.CODE,
-      SAMPLEDATE: r.SAMPLEDATE,
-      SHIFT: r.SHIFT,
-      MILKTYPE: r.MILKTYPE,
-      FAT: r.FAT?.toFixed(1),
-      SNF: r.SNF?.toFixed(1),
-      RATE: r.RATE?.toFixed(2),
-      QTY: r.QTY?.toFixed(2),
-      INCENTIVEAMOUNT: r.INCENTIVEAMOUNT?.toFixed(2),
-      TOTALAMOUNT: r.QTY && r.RATE ? (r.QTY * r.RATE).toFixed(2) : "0.00",
-    }));
+    // ========== 3. Merge summary with records ==========
+    const merged = summaryData.map((summary) => {
+      const matchedRecords = rawRecords.find(
+        (r) => r._id.date === summary.date && r._id.shift === summary.shift
+      );
+      return {
+        ...summary,
+        records: matchedRecords?.records || [],
+      };
+    });
 
     res.json({
       page: pageInt,
       limit: limitInt,
-      summaryCount: summary.length,
-      summary,
-      recordsCount: formattedRecords.length,
-      records: formattedRecords,
+      count: merged.length,
+      data: merged,
     });
   } catch (err) {
     console.error("Aggregation error:", err);
