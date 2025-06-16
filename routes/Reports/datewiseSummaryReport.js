@@ -106,7 +106,7 @@ router.get("/", async (req, res) => {
           _id: 0,
           date: "$_id.date",
           shift: "$_id.shift",
-          //parsedDate: "$_id.parsedDate",
+          parsedDate: "$_id.parsedDate",
           milktypeStats: {
             $map: {
               input: {
@@ -145,7 +145,7 @@ router.get("/", async (req, res) => {
           },
         },
       },
-      { $sort: { parsedDate: 1 } }, // Correct chronological sort
+      { $sort: { parsedDate: 1 } }, // <- now sorting after final grouping
       { $skip: skip },
       { $limit: limitInt },
     ];
