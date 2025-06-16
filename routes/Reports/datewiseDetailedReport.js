@@ -39,7 +39,7 @@ router.get("/", async (req, res) => {
     const parsedTo = new Date(toDate.split("/").reverse().join("-"));
 
     // ========== 1. Summary Pipeline ==========
-    const summaryPipeline = [
+    const summaryBasePipeline = [
       {
         $addFields: {
           parsedDate: {
@@ -146,14 +146,23 @@ router.get("/", async (req, res) => {
           },
         },
       },
+    ];
+
+    // Clone and add count stage to get total
+    const countPipeline = [...summaryBasePipeline, { $count: "totalCount" }];
+    const countResult = await Record.aggregate(countPipeline);
+    const totalCount = countResult[0]?.totalCount || 0;
+
+    // Add sort, skip, limit for paginated summary data
+    const summaryPipeline = [
+      ...summaryBasePipeline,
       { $sort: { parsedDate: 1 } },
       { $skip: skip },
       { $limit: limitInt },
     ];
-
     const summaryData = await Record.aggregate(summaryPipeline);
 
-    // ========== 2. Raw Grouped Records ==========
+    // ========== 2. Raw Records ==========
     const rawRecords = await Record.aggregate([
       {
         $addFields: {
@@ -203,7 +212,7 @@ router.get("/", async (req, res) => {
       },
     ]);
 
-    // ========== 3. Merge summary with records ==========
+    // ========== 3. Merge ==========
     const merged = summaryData.map((summary) => {
       const matchedRecords = rawRecords.find(
         (r) => r._id.date === summary.date && r._id.shift === summary.shift
@@ -218,6 +227,8 @@ router.get("/", async (req, res) => {
       page: pageInt,
       limit: limitInt,
       count: merged.length,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limitInt),
       data: merged,
     });
   } catch (err) {
