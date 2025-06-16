@@ -1,111 +1,227 @@
 const express = require("express");
-const router = express.Router();
 const Record = require("../../models/RecordModel");
-const moment = require("moment");
+const router = express.Router();
 
 router.get("/", async (req, res) => {
+  const {
+    deviceId,
+    fromDate,
+    toDate,
+    fromCode,
+    toCode,
+    shift,
+    page = 1,
+    limit = 25,
+  } = req.query;
+
+  if (!deviceId || !fromDate || !toDate || !fromCode || !toCode) {
+    return res
+      .status(400)
+      .json({ error: "Missing required query parameters." });
+  }
+
+  const isBoth = !shift || shift.toLowerCase() === "both";
+  const pageInt = parseInt(page);
+  const limitInt = parseInt(limit);
+  const skip = (pageInt - 1) * limitInt;
+
   try {
-    const {
-      deviceId,
-      fromDate,
-      toDate,
-      fromCode,
-      toCode,
-      shift,
-      page = 1,
-      limit = 25,
-    } = req.query;
-
-    if (!deviceId || !fromDate || !toDate || !fromCode || !toCode || !shift) {
-      return res
-        .status(400)
-        .json({ error: "Missing required query parameters." });
-    }
-
-    const start = moment(fromDate, "DD/MM/YYYY").format("DD/MM/YYYY");
-    const end = moment(toDate, "DD/MM/YYYY").format("DD/MM/YYYY");
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const matchCondition = {
+    const baseMatch = {
       DEVICEID: deviceId,
       CODE: { $gte: parseInt(fromCode), $lte: parseInt(toCode) },
-      SAMPLEDATE: { $gte: start, $lte: end },
     };
 
-    if (shift.toUpperCase() !== "BOTH") {
-      matchCondition.SHIFT = shift.toUpperCase();
+    if (!isBoth) {
+      baseMatch.SHIFT = shift.toUpperCase();
     }
 
-    // Total record count
-    const totalCount = await Record.countDocuments(matchCondition);
+    const parsedFrom = new Date(fromDate.split("/").reverse().join("-"));
+    const parsedTo = new Date(toDate.split("/").reverse().join("-"));
 
-    // Fetch paginated records
-    const records = await Record.find(matchCondition)
-      .sort({ SAMPLEDATE: 1, SAMPLETIME: 1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    // Format response records
-    const formattedRecords = records.map((rec) => ({
-      CODE: rec.CODE,
-      SAMPLEDATE: moment(rec.SAMPLEDATE, "DD/MM/YYYY").format("DD/MM/YYYY"),
-      SHIFT: rec.SHIFT,
-      FAT: rec.FAT.toFixed(1),
-      SNF: rec.SNF.toFixed(1),
-      RATE: rec.RATE.toFixed(2),
-      QTY: rec.QTY.toFixed(2),
-      INCENTIVEAMOUNT: rec.INCENTIVEAMOUNT.toFixed(2),
-      ANALYZERMODE: rec.ANALYZERMODE,
-      WEIGHTMODE: rec.WEIGHTMODE,
-      WATER: rec.WATER,
-    }));
-
-    // Summary aggregation
-    const summaryAgg = await Record.aggregate([
-      { $match: matchCondition },
+    // ========== 1. Summary Pipeline ==========
+    const summaryPipeline = [
+      {
+        $addFields: {
+          parsedDate: {
+            $dateFromString: {
+              dateString: { $trim: { input: "$SAMPLEDATE" } },
+              format: "%d/%m/%Y",
+            },
+          },
+        },
+      },
+      {
+        $match: {
+          ...baseMatch,
+          parsedDate: { $gte: parsedFrom, $lte: parsedTo },
+        },
+      },
       {
         $group: {
-          _id: "$SHIFT",
-          samples: { $sum: 1 },
+          _id: {
+            date: "$SAMPLEDATE",
+            parsedDate: "$parsedDate",
+            shift: isBoth ? "ALL" : "$SHIFT",
+            milktype: "$MILKTYPE",
+          },
+          totalSamples: { $sum: 1 },
           avgFat: { $avg: "$FAT" },
           avgSnf: { $avg: "$SNF" },
           avgRate: { $avg: "$RATE" },
           totalQty: { $sum: "$QTY" },
-          totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
           totalAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
+          totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            date: "$_id.date",
+            parsedDate: "$_id.parsedDate",
+            shift: "$_id.shift",
+          },
+          milktypeStats: {
+            $push: {
+              milktype: "$_id.milktype",
+              totalSamples: "$totalSamples",
+              avgFat: "$avgFat",
+              avgSnf: "$avgSnf",
+              avgRate: "$avgRate",
+              totalQty: "$totalQty",
+              totalAmount: "$totalAmount",
+              totalIncentive: "$totalIncentive",
+              grandTotal: { $add: ["$totalAmount", "$totalIncentive"] },
+            },
+          },
+          avgFatAll: { $avg: "$avgFat" },
+          totalSamplesAll: { $sum: "$totalSamples" },
+          avgSnfAll: { $avg: "$avgSnf" },
+          avgRateAll: { $avg: "$avgRate" },
+          totalQtyAll: { $sum: "$totalQty" },
+          totalAmountAll: { $sum: "$totalAmount" },
+          totalIncentiveAll: { $sum: "$totalIncentive" },
         },
       },
       {
         $project: {
           _id: 0,
-          shift: "$_id",
-          samples: 1,
-          avgFat: { $round: ["$avgFat", 1] },
-          avgSnf: { $round: ["$avgSnf", 1] },
-          avgRate: { $round: ["$avgRate", 2] },
-          totalQty: { $round: ["$totalQty", 2] },
-          totalAmount: { $round: ["$totalAmount", 2] },
-          totalIncentive: { $round: ["$totalIncentive", 2] },
-          grandTotal: {
-            $round: [{ $add: ["$totalAmount", "$totalIncentive"] }, 2],
+          date: "$_id.date",
+          shift: "$_id.shift",
+          parsedDate: "$_id.parsedDate",
+          milktypeStats: {
+            $map: {
+              input: {
+                $concatArrays: [
+                  "$milktypeStats",
+                  [
+                    {
+                      milktype: "ALL",
+                      totalSamples: "$totalSamplesAll",
+                      avgFat: "$avgFatAll",
+                      avgSnf: "$avgSnfAll",
+                      avgRate: "$avgRateAll",
+                      totalQty: "$totalQtyAll",
+                      totalAmount: "$totalAmountAll",
+                      totalIncentive: "$totalIncentiveAll",
+                      grandTotal: {
+                        $add: ["$totalAmountAll", "$totalIncentiveAll"],
+                      },
+                    },
+                  ],
+                ],
+              },
+              as: "stat",
+              in: {
+                milktype: "$$stat.milktype",
+                totalSamples: "$$stat.totalSamples",
+                avgFat: { $round: ["$$stat.avgFat", 1] },
+                avgSnf: { $round: ["$$stat.avgSnf", 1] },
+                avgRate: { $round: ["$$stat.avgRate", 2] },
+                totalQty: { $round: ["$$stat.totalQty", 2] },
+                totalAmount: { $round: ["$$stat.totalAmount", 2] },
+                totalIncentive: { $round: ["$$stat.totalIncentive", 2] },
+                grandTotal: { $round: ["$$stat.grandTotal", 2] },
+              },
+            },
           },
         },
       },
-      { $sort: { shift: 1 } },
+      { $sort: { parsedDate: 1 } },
+      { $skip: skip },
+      { $limit: limitInt },
+    ];
+
+    const summaryData = await Record.aggregate(summaryPipeline);
+
+    // ========== 2. Raw Grouped Records ==========
+    const rawRecords = await Record.aggregate([
+      {
+        $addFields: {
+          parsedDate: {
+            $dateFromString: {
+              dateString: { $trim: { input: "$SAMPLEDATE" } },
+              format: "%d/%m/%Y",
+              onError: null,
+              onNull: null,
+            },
+          },
+        },
+      },
+      {
+        $match: {
+          ...baseMatch,
+          parsedDate: { $gte: parsedFrom, $lte: parsedTo },
+        },
+      },
+      {
+        $sort: { parsedDate: 1, SAMPLETIME: 1 },
+      },
+      {
+        $group: {
+          _id: {
+            date: "$SAMPLEDATE",
+            shift: "$SHIFT",
+          },
+          records: {
+            $push: {
+              DEVICEID: "$DEVICEID",
+              CODE: "$CODE",
+              SAMPLEDATE: "$SAMPLEDATE",
+              SHIFT: "$SHIFT",
+              MILKTYPE: "$MILKTYPE",
+              FAT: { $round: ["$FAT", 1] },
+              SNF: { $round: ["$SNF", 1] },
+              RATE: { $round: ["$RATE", 2] },
+              QTY: { $round: ["$QTY", 2] },
+              INCENTIVEAMOUNT: { $round: ["$INCENTIVEAMOUNT", 2] },
+              TOTALAMOUNT: {
+                $round: [{ $multiply: ["$QTY", "$RATE"] }, 2],
+              },
+            },
+          },
+        },
+      },
     ]);
 
+    // ========== 3. Merge summary with records ==========
+    const merged = summaryData.map((summary) => {
+      const matchedRecords = rawRecords.find(
+        (r) => r._id.date === summary.date && r._id.shift === summary.shift
+      );
+      return {
+        ...summary,
+        records: matchedRecords?.records || [],
+      };
+    });
+
     res.json({
-      summary: summaryAgg,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalRecords: totalCount,
-        totalPages: Math.ceil(totalCount / parseInt(limit)),
-      },
-      records: formattedRecords,
+      page: pageInt,
+      limit: limitInt,
+      count: merged.length,
+      data: merged,
     });
   } catch (err) {
-    console.error("Error:", err);
+    console.error("Aggregation error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

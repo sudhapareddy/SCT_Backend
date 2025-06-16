@@ -59,6 +59,7 @@ router.get("/", async (req, res) => {
         $group: {
           _id: {
             date: "$SAMPLEDATE",
+            parsedDate: "$parsedDate",
             shift: isBoth ? "ALL" : "$SHIFT",
             milktype: "$MILKTYPE",
           },
@@ -75,6 +76,7 @@ router.get("/", async (req, res) => {
         $group: {
           _id: {
             date: "$_id.date",
+            parsedDate: "$_id.parsedDate",
             shift: "$_id.shift",
           },
           milktypeStats: {
@@ -104,6 +106,7 @@ router.get("/", async (req, res) => {
           _id: 0,
           date: "$_id.date",
           shift: "$_id.shift",
+          parsedDate: "$_id.parsedDate",
           milktypeStats: {
             $map: {
               input: {
