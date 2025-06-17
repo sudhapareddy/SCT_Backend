@@ -38,14 +38,16 @@ router.get("/", async (req, res) => {
     const parsedFrom = new Date(fromDate.split("/").reverse().join("-"));
     const parsedTo = new Date(toDate.split("/").reverse().join("-"));
 
-    // ========== 1. Summary Pipeline ==========
-    const summaryBasePipeline = [
+    // ========== Shared Base Pipeline ==========
+    const pipelineBase = [
       {
         $addFields: {
           parsedDate: {
             $dateFromString: {
               dateString: { $trim: { input: "$SAMPLEDATE" } },
               format: "%d/%m/%Y",
+              onError: null,
+              onNull: null,
             },
           },
         },
@@ -61,7 +63,7 @@ router.get("/", async (req, res) => {
           _id: {
             date: "$SAMPLEDATE",
             parsedDate: "$parsedDate",
-            shift: isBoth ? "ALL" : "$SHIFT",
+            shift: isBoth ? "$SHIFT" : shift.toUpperCase(),
             milktype: "$MILKTYPE",
           },
           totalSamples: { $sum: 1 },
@@ -148,21 +150,22 @@ router.get("/", async (req, res) => {
       },
     ];
 
-    // Clone and add count stage to get total
-    const countPipeline = [...summaryBasePipeline, { $count: "totalCount" }];
-    const countResult = await Record.aggregate(countPipeline);
-    const totalCount = countResult[0]?.totalCount || 0;
+    // ========== Count Total ==========
+    const countPipeline = [...pipelineBase, { $count: "totalCount" }];
+    const [countResult] = await Record.aggregate(countPipeline);
+    const totalCount = countResult?.totalCount || 0;
 
-    // Add sort, skip, limit for paginated summary data
-    const summaryPipeline = [
-      ...summaryBasePipeline,
+    // ========== Paginated Summary Data ==========
+    const paginatedPipeline = [
+      ...pipelineBase,
       { $sort: { parsedDate: 1 } },
       { $skip: skip },
       { $limit: limitInt },
     ];
-    const summaryData = await Record.aggregate(summaryPipeline);
 
-    // ========== 2. Raw Records ==========
+    const summaryData = await Record.aggregate(paginatedPipeline);
+
+    // ========== Raw Records Grouped by Date & Shift ==========
     const rawRecords = await Record.aggregate([
       {
         $addFields: {
@@ -183,13 +186,10 @@ router.get("/", async (req, res) => {
         },
       },
       {
-        $sort: { parsedDate: 1, SAMPLETIME: 1 },
-      },
-      {
         $group: {
           _id: {
             date: "$SAMPLEDATE",
-            shift: "$SHIFT",
+            shift: isBoth ? "$SHIFT" : shift.toUpperCase(),
           },
           records: {
             $push: {
@@ -212,28 +212,20 @@ router.get("/", async (req, res) => {
       },
     ]);
 
-    // ========== 3. Merge & Final Sort ==========
+    // ========== Merge Raw Records with Summary ==========
     const merged = summaryData.map((summary) => {
-      const matchedRecords = rawRecords.find(
+      const matched = rawRecords.find(
         (r) => r._id.date === summary.date && r._id.shift === summary.shift
       );
       return {
         ...summary,
-        records: matchedRecords?.records || [],
+        records: matched?.records || [],
       };
-    });
-
-    // Sort final merged result by parsedDate and shift
-    merged.sort((a, b) => {
-      const dateDiff = new Date(a.parsedDate) - new Date(b.parsedDate);
-      if (dateDiff !== 0) return dateDiff;
-      return a.shift.localeCompare(b.shift); // e.g. MORNING before EVENING
     });
 
     res.json({
       page: pageInt,
       limit: limitInt,
-      count: merged.length,
       totalCount,
       totalPages: Math.ceil(totalCount / limitInt),
       data: merged,
