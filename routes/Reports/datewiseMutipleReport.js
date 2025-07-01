@@ -31,7 +31,6 @@ router.get("/multiple", async (req, res) => {
           averageFat: { $avg: "$FAT" },
           averageSNF: { $avg: "$SNF" },
           averageCLR: { $avg: "$CLR" },
-          weightedRateAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
           totalRecords: { $sum: 1 },
         },
       },
@@ -40,7 +39,7 @@ router.get("/multiple", async (req, res) => {
           averageRate: {
             $cond: [
               { $gt: ["$totalQuantity", 0] },
-              { $divide: ["$weightedRateAmount", "$totalQuantity"] },
+              { $divide: ["$totalAmount", "$totalQuantity"] },
               0,
             ],
           },
@@ -63,12 +62,11 @@ router.get("/multiple", async (req, res) => {
           averageCLR: 0,
           averageRate: 0,
           totalRecords: 0,
-          weightedRateAmount: 0,
         });
       }
     });
 
-    // Calculate TOTAL row
+    // Calculate TOTAL row manually
     const totalRow = totals.reduce(
       (acc, item) => {
         if (item._id.milkType === "TOTAL") return acc;
@@ -76,7 +74,6 @@ router.get("/multiple", async (req, res) => {
         acc.totalQuantity += item.totalQuantity;
         acc.totalAmount += item.totalAmount;
         acc.totalIncentive += item.totalIncentive;
-        acc.weightedRateAmount += item.weightedRateAmount;
         acc.totalFat += item.averageFat * item.totalQuantity;
         acc.totalSNF += item.averageSNF * item.totalQuantity;
         acc.totalCLR += item.averageCLR * item.totalQuantity;
@@ -89,7 +86,6 @@ router.get("/multiple", async (req, res) => {
         totalQuantity: 0,
         totalAmount: 0,
         totalIncentive: 0,
-        weightedRateAmount: 0,
         totalFat: 0,
         totalSNF: 0,
         totalCLR: 0,
@@ -97,16 +93,13 @@ router.get("/multiple", async (req, res) => {
       }
     );
 
-    // Final computed average values
     const qty = totalRow.totalQuantity || 1;
     totalRow.averageFat = +(totalRow.totalFat / qty).toFixed(1);
     totalRow.averageSNF = +(totalRow.totalSNF / qty).toFixed(1);
     totalRow.averageCLR = +(totalRow.totalCLR / qty).toFixed(1);
-    totalRow.averageRate = totalRow.totalQuantity
-      ? +(totalRow.weightedRateAmount / totalRow.totalQuantity).toFixed(2)
-      : 0;
+    totalRow.averageRate = +(totalRow.totalAmount / qty).toFixed(2);
 
-    // Push TOTAL to totals
+    // Add TOTAL row to list
     totals.push(totalRow);
 
     // Final formatting
@@ -122,7 +115,6 @@ router.get("/multiple", async (req, res) => {
       totalRecords: item.totalRecords || 0,
     }));
 
-    // Sort as COW, BUF, TOTAL
     totals.sort(
       (a, b) =>
         milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType)
