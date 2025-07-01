@@ -50,8 +50,8 @@ router.get("/multiple", async (req, res) => {
     ]);
 
     // Ensure COW and BUF are always present
-    const milkTypes = ["COW", "BUF"];
-    milkTypes.forEach((type) => {
+    const milkTypes = ["COW", "BUF", "TOTAL"];
+    milkTypes.slice(0, 2).forEach((type) => {
       if (!totals.find((t) => t._id.milkType === type)) {
         totals.push({
           _id: { milkType: type },
@@ -63,20 +63,66 @@ router.get("/multiple", async (req, res) => {
           averageCLR: 0,
           averageRate: 0,
           totalRecords: 0,
+          weightedRateAmount: 0,
         });
       }
     });
 
-    // Format fixed-point values
+    // Calculate TOTAL row
+    const totalRow = totals.reduce(
+      (acc, item) => {
+        if (item._id.milkType === "TOTAL") return acc;
+
+        acc.totalQuantity += item.totalQuantity;
+        acc.totalAmount += item.totalAmount;
+        acc.totalIncentive += item.totalIncentive;
+        acc.weightedRateAmount += item.weightedRateAmount;
+        acc.totalFat += item.averageFat * item.totalQuantity;
+        acc.totalSNF += item.averageSNF * item.totalQuantity;
+        acc.totalCLR += item.averageCLR * item.totalQuantity;
+        acc.totalRecords += item.totalRecords;
+
+        return acc;
+      },
+      {
+        _id: { milkType: "TOTAL" },
+        totalQuantity: 0,
+        totalAmount: 0,
+        totalIncentive: 0,
+        weightedRateAmount: 0,
+        totalFat: 0,
+        totalSNF: 0,
+        totalCLR: 0,
+        totalRecords: 0,
+      }
+    );
+
+    // Final computed average values
+    const qty = totalRow.totalQuantity || 1;
+    totalRow.averageFat = +(totalRow.totalFat / qty).toFixed(1);
+    totalRow.averageSNF = +(totalRow.totalSNF / qty).toFixed(1);
+    totalRow.averageCLR = +(totalRow.totalCLR / qty).toFixed(1);
+    totalRow.averageRate = totalRow.totalQuantity
+      ? +(totalRow.weightedRateAmount / totalRow.totalQuantity).toFixed(2)
+      : 0;
+
+    // Push TOTAL to totals
+    totals.push(totalRow);
+
+    // Final formatting
     totals = totals.map((item) => ({
-      ...item,
+      _id: item._id,
+      totalQuantity: item.totalQuantity,
+      totalAmount: item.totalAmount,
+      totalIncentive: item.totalIncentive,
       averageFat: item.averageFat ? item.averageFat.toFixed(1) : "0.0",
       averageSNF: item.averageSNF ? item.averageSNF.toFixed(1) : "0.0",
       averageCLR: item.averageCLR ? item.averageCLR.toFixed(1) : "0.0",
       averageRate: item.averageRate ? item.averageRate.toFixed(2) : "0.00",
+      totalRecords: item.totalRecords || 0,
     }));
 
-    // Sort as per order
+    // Sort as COW, BUF, TOTAL
     totals.sort(
       (a, b) =>
         milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType)
