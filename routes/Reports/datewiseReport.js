@@ -32,6 +32,7 @@ router.get("/", async (req, res) => {
           totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
           averageFat: { $avg: "$FAT" },
           averageSNF: { $avg: "$SNF" },
+          averageCLR: { $avg: "$CLR" },
           weightedRateAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
           totalRecords: { $sum: 1 },
         },
@@ -64,6 +65,7 @@ router.get("/", async (req, res) => {
                 totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
                 averageFat: { $avg: "$FAT" },
                 averageSNF: { $avg: "$SNF" },
+                averageCLR: { $avg: "$CLR" },
                 weightedRateAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
                 totalRecords: { $sum: 1 },
               },
@@ -85,6 +87,7 @@ router.get("/", async (req, res) => {
       { $sort: { "_id.milkType": 1 } },
     ]);
 
+    // Ensure COW, BUF, TOTAL types are present
     const milkTypes = ["COW", "BUF", "TOTAL"];
     milkTypes.forEach((type) => {
       if (!totals.find((t) => t._id.milkType === type)) {
@@ -95,6 +98,7 @@ router.get("/", async (req, res) => {
           totalIncentive: 0,
           averageFat: 0,
           averageSNF: 0,
+          averageCLR: 0,
           averageRate: 0,
           totalRecords: 0,
         });
@@ -106,10 +110,12 @@ router.get("/", async (req, res) => {
         milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType)
     );
 
+    // Format numbers
     totals = totals.map((item) => ({
       ...item,
       averageFat: item.averageFat ? item.averageFat.toFixed(1) : "0.0",
       averageSNF: item.averageSNF ? item.averageSNF.toFixed(1) : "0.0",
+      averageCLR: item.averageCLR ? item.averageCLR.toFixed(1) : "0.0",
       averageRate: item.averageRate ? item.averageRate.toFixed(2) : "0.00",
     }));
 
@@ -122,7 +128,7 @@ router.get("/", async (req, res) => {
     const records = await Record.find(matchCondition)
       .skip(skip)
       .limit(pageSize)
-      .sort({ CREATEDAT: -1 }); // optional: adjust sort
+      .sort({ CREATEDAT: -1 });
 
     const enrichedRecords = records.map((r) => {
       const amount = (r.RATE || 0) * (r.QTY || 0);

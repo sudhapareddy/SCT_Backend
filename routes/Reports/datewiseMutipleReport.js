@@ -6,9 +6,9 @@ router.get("/multiple", async (req, res) => {
   const { deviceCodes, date, shift } = req.query;
 
   if (!deviceCodes || !date) {
-    return res
-      .status(400)
-      .json({ error: "Device codes and date are required." });
+    return res.status(400).json({
+      error: "Device codes and date are required.",
+    });
   }
 
   const deviceCodeArray = deviceCodes.split(",");
@@ -30,6 +30,7 @@ router.get("/multiple", async (req, res) => {
           totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
           averageFat: { $avg: "$FAT" },
           averageSNF: { $avg: "$SNF" },
+          averageCLR: { $avg: "$CLR" },
           weightedRateAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
           totalRecords: { $sum: 1 },
         },
@@ -58,6 +59,7 @@ router.get("/multiple", async (req, res) => {
                 totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
                 averageFat: { $avg: "$FAT" },
                 averageSNF: { $avg: "$SNF" },
+                averageCLR: { $avg: "$CLR" },
                 weightedRateAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
                 totalRecords: { $sum: 1 },
               },
@@ -90,6 +92,7 @@ router.get("/multiple", async (req, res) => {
           totalIncentive: 0,
           averageFat: 0,
           averageSNF: 0,
+          averageCLR: 0,
           averageRate: 0,
           totalRecords: 0,
         });
@@ -101,33 +104,32 @@ router.get("/multiple", async (req, res) => {
       ...item,
       averageFat: item.averageFat ? item.averageFat.toFixed(1) : "0.0",
       averageSNF: item.averageSNF ? item.averageSNF.toFixed(1) : "0.0",
+      averageCLR: item.averageCLR ? item.averageCLR.toFixed(1) : "0.0",
       averageRate: item.averageRate ? item.averageRate.toFixed(2) : "0.00",
+      totalQuantity: item.totalQuantity?.toFixed(2) || "0.00",
+      totalAmount: item.totalAmount?.toFixed(2) || "0.00",
+      totalIncentive: item.totalIncentive?.toFixed(2) || "0.00",
     }));
 
     totals.sort(
-      (a, b) =>
-        milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType)
+      (a, b) => milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType)
     );
 
     const records = await Record.find(matchCondition);
 
     if (totals.length === 0 && records.length === 0) {
-      return res
-        .status(404)
-        .json({
-          error: "No records found for the given device codes and date.",
-        });
+      return res.status(404).json({
+        error: "No records found for the given device codes and date.",
+      });
     }
 
     return res.json({ totals, records });
   } catch (err) {
     console.error("Error generating multi-device report:", err);
-    res
-      .status(500)
-      .json({
-        error: err.message || "Internal server error",
-        stack: err.stack,
-      });
+    res.status(500).json({
+      error: err.message || "Internal server error",
+      stack: err.stack,
+    });
   }
 });
 
