@@ -39,6 +39,7 @@ router.get("/", async (req, res) => {
     let grandFatSum = 0;
     let grandSnfSum = 0;
     let grandClrSum = 0;
+    let grandRateSum = 0;
     let grandCount = 0;
 
     for (const rec of filteredRecords) {
@@ -62,6 +63,7 @@ router.get("/", async (req, res) => {
           fatSum: 0,
           snfSum: 0,
           clrSum: 0,
+          rateSum: 0,
           count: 0,
         };
       }
@@ -72,6 +74,7 @@ router.get("/", async (req, res) => {
       resultMap[key].fatSum += fat;
       resultMap[key].snfSum += snf;
       resultMap[key].clrSum += clr;
+      resultMap[key].rateSum += rate;
       resultMap[key].count += 1;
 
       if (!milkTypeTotals[milkType]) {
@@ -83,6 +86,7 @@ router.get("/", async (req, res) => {
           fatSum: 0,
           snfSum: 0,
           clrSum: 0,
+          rateSum: 0,
           count: 0,
           memberCount: new Set(),
         };
@@ -94,6 +98,7 @@ router.get("/", async (req, res) => {
       milkTypeTotals[milkType].fatSum += fat;
       milkTypeTotals[milkType].snfSum += snf;
       milkTypeTotals[milkType].clrSum += clr;
+      milkTypeTotals[milkType].rateSum += rate;
       milkTypeTotals[milkType].count += 1;
       milkTypeTotals[milkType].memberCount.add(code);
 
@@ -103,12 +108,13 @@ router.get("/", async (req, res) => {
       grandFatSum += fat;
       grandSnfSum += snf;
       grandClrSum += clr;
+      grandRateSum += rate;
       grandCount += 1;
     }
 
     const finalList = Object.values(resultMap)
       .map((item) => {
-        const avgRate = item.totalQty > 0 ? item.totalAmount / item.totalQty : 0;
+        const avgRate = item.count > 0 ? item.rateSum / item.count : 0;
         const avgFat = item.count > 0 ? item.fatSum / item.count : 0;
         const avgSnf = item.count > 0 ? item.snfSum / item.count : 0;
         const avgClr = item.count > 0 ? item.clrSum / item.count : 0;
@@ -138,6 +144,7 @@ router.get("/", async (req, res) => {
       const avgFat = item.count > 0 ? item.fatSum / item.count : 0;
       const avgSnf = item.count > 0 ? item.snfSum / item.count : 0;
       const avgClr = item.count > 0 ? item.clrSum / item.count : 0;
+      const avgRate = item.count > 0 ? item.rateSum / item.count : 0;
 
       return {
         MILKTYPE: item.MILKTYPE,
@@ -146,6 +153,7 @@ router.get("/", async (req, res) => {
         avgFat: avgFat.toFixed(1),
         avgSnf: avgSnf.toFixed(1),
         avgClr: avgClr.toFixed(1),
+        avgRate: avgRate.toFixed(2),
         totalAmount: item.totalAmount.toFixed(2),
         totalIncentive: item.totalIncentive.toFixed(2),
         grandTotal: (item.totalAmount + item.totalIncentive).toFixed(2),
@@ -155,6 +163,7 @@ router.get("/", async (req, res) => {
     const grandAvgFat = grandCount > 0 ? (grandFatSum / grandCount).toFixed(1) : "0.0";
     const grandAvgSnf = grandCount > 0 ? (grandSnfSum / grandCount).toFixed(1) : "0.0";
     const grandAvgClr = grandCount > 0 ? (grandClrSum / grandCount).toFixed(1) : "0.0";
+    const grandAvgRate = grandCount > 0 ? (grandRateSum / grandCount).toFixed(2) : "0.00";
 
     res.json({
       data: paginatedList,
@@ -167,6 +176,7 @@ router.get("/", async (req, res) => {
       grandAvgFat,
       grandAvgSnf,
       grandAvgClr,
+      grandAvgRate,
       pagination: {
         page: pageNum,
         limit: limitNum,
