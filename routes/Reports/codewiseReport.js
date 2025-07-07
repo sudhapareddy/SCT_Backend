@@ -3,7 +3,7 @@ const Record = require('../../models/RecordModel');
 const router = express.Router();
 
 router.get('/', async (req, res) => {
-  const { deviceCode, memberCode, fromDate, toDate, page = 1, limit = 10 } = req.query;
+  const { deviceCode, memberCode, fromDate, toDate, page, limit } = req.query;
 
   if (!deviceCode || !memberCode || !fromDate || !toDate) {
     return res.status(400).json({
@@ -11,8 +11,18 @@ router.get('/', async (req, res) => {
     });
   }
 
-  const pageNum = parseInt(page);
-  const limitNum = parseInt(limit);
+  let pageNum, limitNum;
+  if (page && limit) {
+    pageNum = parseInt(page);
+    limitNum = parseInt(limit);
+
+    if (
+      isNaN(pageNum) || pageNum <= 0 ||
+      isNaN(limitNum) || limitNum <= 0
+    ) {
+      return res.status(400).json({ error: 'Invalid page or limit value.' });
+    }
+  }
 
   try {
     let totals = await Record.aggregate([
@@ -39,7 +49,7 @@ router.get('/', async (req, res) => {
           totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
           averageFat: { $avg: "$FAT" },
           averageSNF: { $avg: "$SNF" },
-          averageCLR: { $avg: "$CLR" }, // ✅ Added average CLR
+          averageCLR: { $avg: "$CLR" },
           averageRate: { $avg: "$RATE" },
           totalRecords: { $sum: 1 }
         }
@@ -71,7 +81,7 @@ router.get('/', async (req, res) => {
                 totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
                 averageFat: { $avg: "$FAT" },
                 averageSNF: { $avg: "$SNF" },
-                averageCLR: { $avg: "$CLR" }, // ✅ Added average CLR
+                averageCLR: { $avg: "$CLR" },
                 averageRate: { $avg: "$RATE" },
                 totalRecords: { $sum: 1 }
               }
@@ -107,7 +117,7 @@ router.get('/', async (req, res) => {
       ...item,
       averageFat: item.averageFat ? item.averageFat.toFixed(1) : "0.0",
       averageSNF: item.averageSNF ? item.averageSNF.toFixed(1) : "0.0",
-      averageCLR: item.averageCLR ? item.averageCLR.toFixed(1) : "0.0", // ✅ Rounded CLR
+      averageCLR: item.averageCLR ? item.averageCLR.toFixed(1) : "0.0",
       averageRate: item.averageRate ? item.averageRate.toFixed(2) : "0.00",
       totalQuantity: item.totalQuantity?.toFixed(2) || "0.00",
       totalAmount: item.totalAmount?.toFixed(2) || "0.00",
@@ -143,10 +153,16 @@ router.get('/', async (req, res) => {
       };
     });
 
-    // Slice for pagination
     const totalRecords = enrichedRecords.length;
-    const startIndex = (pageNum - 1) * limitNum;
-    const paginatedRecords = enrichedRecords.slice(startIndex, startIndex + limitNum);
+    let paginatedRecords = enrichedRecords;
+    let totalPages = 1;
+
+    // Apply pagination if page and limit provided
+    if (pageNum && limitNum) {
+      const startIndex = (pageNum - 1) * limitNum;
+      paginatedRecords = enrichedRecords.slice(startIndex, startIndex + limitNum);
+      totalPages = Math.ceil(totalRecords / limitNum);
+    }
 
     if (totals.length === 0 && totalRecords === 0) {
       return res.status(404).json({ error: 'No records found for the given criteria.' });
@@ -155,10 +171,10 @@ router.get('/', async (req, res) => {
     res.json({
       totals,
       records: paginatedRecords,
-      page: pageNum,
-      limit: limitNum,
+      page: pageNum || null,
+      limit: limitNum || null,
       totalRecords,
-      totalPages: Math.ceil(totalRecords / limitNum),
+      totalPages
     });
   } catch (err) {
     console.error('Error generating codewise report:', err);

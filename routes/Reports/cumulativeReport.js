@@ -4,7 +4,7 @@ const router = express.Router();
 const Record = require("../../models/RecordModel");
 
 router.get("/", async (req, res) => {
-  const { deviceid, fromDate, toDate, fromCode, toCode, page = 1, limit = 10 } = req.query;
+  const { deviceid, fromDate, toDate, fromCode, toCode, page, limit } = req.query;
 
   if (!deviceid || !fromDate || !toDate || !fromCode || !toCode) {
     return res.status(400).json({
@@ -15,8 +15,8 @@ router.get("/", async (req, res) => {
   try {
     const fromCodeNum = parseInt(fromCode);
     const toCodeNum = parseInt(toCode);
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
+    const pageNum = page ? parseInt(page) : null;
+    const limitNum = limit ? parseInt(limit) : null;
 
     const from = moment(fromDate, "DD/MM/YYYY");
     const to = moment(toDate, "DD/MM/YYYY");
@@ -138,7 +138,14 @@ router.get("/", async (req, res) => {
       });
 
     const totalRecords = finalList.length;
-    const paginatedList = finalList.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+    let paginatedList = finalList;
+    let totalPages = 1;
+
+    if (pageNum && limitNum) {
+      const startIndex = (pageNum - 1) * limitNum;
+      paginatedList = finalList.slice(startIndex, startIndex + limitNum);
+      totalPages = Math.ceil(totalRecords / limitNum);
+    }
 
     const milkTypeSummary = Object.values(milkTypeTotals).map((item) => {
       const avgFat = item.count > 0 ? item.fatSum / item.count : 0;
@@ -177,12 +184,14 @@ router.get("/", async (req, res) => {
       grandAvgSnf,
       grandAvgClr,
       grandAvgRate,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        totalRecords: totalRecords,
-        totalPages: Math.ceil(totalRecords / limitNum),
-      },
+      pagination: pageNum && limitNum
+        ? {
+          page: pageNum,
+          limit: limitNum,
+          totalRecords,
+          totalPages
+        }
+        : null,
     });
   } catch (error) {
     console.error("Cumulative report error:", error);

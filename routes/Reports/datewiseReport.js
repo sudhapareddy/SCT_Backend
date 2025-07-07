@@ -3,7 +3,7 @@ const Record = require("../../models/RecordModel");
 const router = express.Router();
 
 router.get("/", async (req, res) => {
-  const { deviceCode, date, shift, page = 1, limit = 20 } = req.query;
+  const { deviceCode, date, shift, page, limit } = req.query;
 
   if (!deviceCode || !date) {
     return res
@@ -119,28 +119,55 @@ router.get("/", async (req, res) => {
       averageRate: item.averageRate ? item.averageRate.toFixed(2) : "0.00",
     }));
 
-    const pageNumber = parseInt(page);
-    const pageSize = parseInt(limit);
-    const skip = (pageNumber - 1) * pageSize;
+    let enrichedRecords;
+    let totalRecordsCount;
+    let pagination = null;
 
-    const totalRecordsCount = await Record.countDocuments(matchCondition);
+    if (page && limit) {
+      // ✅ Pagination requested
+      const pageNumber = parseInt(page);
+      const pageSize = parseInt(limit);
+      const skip = (pageNumber - 1) * pageSize;
 
-    const records = await Record.find(matchCondition)
-      .skip(skip)
-      .limit(pageSize)
-      .sort({ CREATEDAT: -1 });
+      totalRecordsCount = await Record.countDocuments(matchCondition);
 
-    const enrichedRecords = records.map((r) => {
-      const amount = (r.RATE || 0) * (r.QTY || 0);
-      const total = amount + (r.INCENTIVEAMOUNT || 0);
-      return {
-        ...r._doc,
-        AMOUNT: +amount.toFixed(2),
-        TOTAL: +total.toFixed(2),
+      const records = await Record.find(matchCondition)
+        .skip(skip)
+        .limit(pageSize)
+        .sort({ CREATEDAT: -1 });
+
+      enrichedRecords = records.map((r) => {
+        const amount = (r.RATE || 0) * (r.QTY || 0);
+        const total = amount + (r.INCENTIVEAMOUNT || 0);
+        return {
+          ...r._doc,
+          AMOUNT: +amount.toFixed(2),
+          TOTAL: +total.toFixed(2),
+        };
+      });
+
+      pagination = {
+        totalRecords: totalRecordsCount,
+        page: pageNumber,
+        limit: pageSize,
+        totalPages: Math.ceil(totalRecordsCount / pageSize),
       };
-    });
+    } else {
+      // ✅ No pagination: fetch all records
+      const records = await Record.find(matchCondition).sort({ CREATEDAT: -1 });
 
-    if (totals.length === 0 && records.length === 0) {
+      enrichedRecords = records.map((r) => {
+        const amount = (r.RATE || 0) * (r.QTY || 0);
+        const total = amount + (r.INCENTIVEAMOUNT || 0);
+        return {
+          ...r._doc,
+          AMOUNT: +amount.toFixed(2),
+          TOTAL: +total.toFixed(2),
+        };
+      });
+    }
+
+    if (totals.length === 0 && enrichedRecords.length === 0) {
       return res.status(404).json({
         error: "No records found for the given device code and date.",
       });
@@ -149,12 +176,7 @@ router.get("/", async (req, res) => {
     return res.json({
       totals,
       records: enrichedRecords,
-      pagination: {
-        totalRecords: totalRecordsCount,
-        page: pageNumber,
-        limit: pageSize,
-        totalPages: Math.ceil(totalRecordsCount / pageSize),
-      },
+      ...(pagination ? { pagination } : {}), // ✅ Include pagination only if present
     });
   } catch (err) {
     console.error("Error generating report:", err);

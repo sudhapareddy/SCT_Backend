@@ -6,7 +6,7 @@ const Record = require("../../models/RecordModel");
 
 // GET /api/reports/absent-members-report?deviceid=SCT1234&date=28/05/2025&shift=EVENING&page=1&limit=10
 router.get("/", async (req, res) => {
-  const { deviceid, date, shift, page = 1, limit = 10 } = req.query;
+  const { deviceid, date, shift, page, limit } = req.query;
 
   if (!deviceid || !date || !shift) {
     return res
@@ -14,11 +14,17 @@ router.get("/", async (req, res) => {
       .json({ error: "deviceid, date, and shift are required" });
   }
 
-  const pageNum = parseInt(page);
-  const limitNum = parseInt(limit);
+  let pageNum, limitNum;
+  if (page && limit) {
+    pageNum = parseInt(page);
+    limitNum = parseInt(limit);
 
-  if (isNaN(pageNum) || pageNum <= 0 || isNaN(limitNum) || limitNum <= 0) {
-    return res.status(400).json({ error: "Invalid page or limit value" });
+    if (
+      isNaN(pageNum) || pageNum <= 0 ||
+      isNaN(limitNum) || limitNum <= 0
+    ) {
+      return res.status(400).json({ error: "Invalid page or limit value" });
+    }
   }
 
   try {
@@ -56,9 +62,15 @@ router.get("/", async (req, res) => {
       (m) => m.MILKTYPE?.toUpperCase() === "B"
     ).length;
 
-    // 5. Pagination
-    const startIndex = (pageNum - 1) * limitNum;
-    const paginatedAbsent = absentMembersAll.slice(startIndex, startIndex + limitNum);
+    let paginatedAbsent = absentMembersAll;
+    let totalPages = 1;
+
+    // 5. Apply pagination if page and limit provided
+    if (pageNum && limitNum) {
+      const startIndex = (pageNum - 1) * limitNum;
+      paginatedAbsent = absentMembersAll.slice(startIndex, startIndex + limitNum);
+      totalPages = Math.ceil(absentMembersAll.length / limitNum);
+    }
 
     // 6. Return result
     res.json({
@@ -68,9 +80,9 @@ router.get("/", async (req, res) => {
       totalRecords: absentMembersAll.length,
       cowAbsentCount,
       bufAbsentCount,
-      page: pageNum,
-      limit: limitNum,
-      totalPages: Math.ceil(absentMembersAll.length / limitNum),
+      page: pageNum || null,
+      limit: limitNum || null,
+      totalPages: totalPages,
       absentMembers: paginatedAbsent,
     });
   } catch (error) {

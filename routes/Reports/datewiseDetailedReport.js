@@ -10,8 +10,8 @@ router.get("/", async (req, res) => {
     fromCode,
     toCode,
     shift,
-    page = 1,
-    limit = 25,
+    page,
+    limit,
   } = req.query;
 
   if (!deviceId || !fromDate || !toDate || !fromCode || !toCode) {
@@ -19,9 +19,9 @@ router.get("/", async (req, res) => {
   }
 
   const isBoth = !shift || shift.toLowerCase() === "both";
-  const pageInt = parseInt(page);
-  const limitInt = parseInt(limit);
-  const skip = (pageInt - 1) * limitInt;
+  const pageInt = page ? parseInt(page) : null;
+  const limitInt = limit ? parseInt(limit) : null;
+  const skip = pageInt && limitInt ? (pageInt - 1) * limitInt : null;
 
   try {
     const baseMatch = {
@@ -152,15 +152,21 @@ router.get("/", async (req, res) => {
       },
     ];
 
-    const countPipeline = [...pipelineBase, { $count: "totalCount" }];
-    const [countResult] = await Record.aggregate(countPipeline);
-    const totalCount = countResult?.totalCount || 0;
+    // Count total records (only if pagination is requested)
+    let totalCount = null;
+    if (pageInt && limitInt) {
+      const countPipeline = [...pipelineBase, { $count: "totalCount" }];
+      const [countResult] = await Record.aggregate(countPipeline);
+      totalCount = countResult?.totalCount || 0;
+    }
 
+    // Apply pagination if requested
     const paginatedPipeline = [
       ...pipelineBase,
       { $sort: { parsedDate: 1 } },
-      { $skip: skip },
-      { $limit: limitInt },
+      ...(pageInt && limitInt
+        ? [{ $skip: skip }, { $limit: limitInt }]
+        : []),
     ];
 
     const summaryData = await Record.aggregate(paginatedPipeline);
@@ -223,10 +229,14 @@ router.get("/", async (req, res) => {
     });
 
     res.json({
-      page: pageInt,
-      limit: limitInt,
-      totalCount,
-      totalPages: Math.ceil(totalCount / limitInt),
+      ...(pageInt && limitInt
+        ? {
+          page: pageInt,
+          limit: limitInt,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limitInt),
+        }
+        : {}),
       data: merged,
     });
   } catch (err) {
