@@ -38,7 +38,6 @@ router.get("/", async (req, res) => {
     const parsedFrom = new Date(fromDate.split("/").reverse().join("-"));
     const parsedTo = new Date(toDate.split("/").reverse().join("-"));
 
-    // ========== Shared Base Pipeline ==========
     const pipelineBase = [
       {
         $addFields: {
@@ -67,6 +66,7 @@ router.get("/", async (req, res) => {
           totalSamples: { $sum: 1 },
           avgFat: { $avg: "$FAT" },
           avgSnf: { $avg: "$SNF" },
+          avgClr: { $avg: "$CLR" },
           avgRate: { $avg: "$RATE" },
           totalQty: { $sum: "$QTY" },
           totalAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
@@ -86,6 +86,7 @@ router.get("/", async (req, res) => {
               totalSamples: "$totalSamples",
               avgFat: "$avgFat",
               avgSnf: "$avgSnf",
+              avgClr: "$avgClr",
               avgRate: "$avgRate",
               totalQty: "$totalQty",
               totalAmount: "$totalAmount",
@@ -94,9 +95,10 @@ router.get("/", async (req, res) => {
             },
           },
           avgFatAll: { $avg: "$avgFat" },
-          totalSamplesAll: { $sum: "$totalSamples" },
           avgSnfAll: { $avg: "$avgSnf" },
+          avgClrAll: { $avg: "$avgClr" },
           avgRateAll: { $avg: "$avgRate" },
+          totalSamplesAll: { $sum: "$totalSamples" },
           totalQtyAll: { $sum: "$totalQty" },
           totalAmountAll: { $sum: "$totalAmount" },
           totalIncentiveAll: { $sum: "$totalIncentive" },
@@ -119,6 +121,7 @@ router.get("/", async (req, res) => {
                       totalSamples: "$totalSamplesAll",
                       avgFat: "$avgFatAll",
                       avgSnf: "$avgSnfAll",
+                      avgClr: "$avgClrAll",
                       avgRate: "$avgRateAll",
                       totalQty: "$totalQtyAll",
                       totalAmount: "$totalAmountAll",
@@ -136,6 +139,7 @@ router.get("/", async (req, res) => {
                 totalSamples: "$$stat.totalSamples",
                 avgFat: { $round: ["$$stat.avgFat", 1] },
                 avgSnf: { $round: ["$$stat.avgSnf", 1] },
+                avgClr: { $round: ["$$stat.avgClr", 1] },
                 avgRate: { $round: ["$$stat.avgRate", 2] },
                 totalQty: { $round: ["$$stat.totalQty", 2] },
                 totalAmount: { $round: ["$$stat.totalAmount", 2] },
@@ -148,12 +152,10 @@ router.get("/", async (req, res) => {
       },
     ];
 
-    // ========== Count Total (Before Pagination) ==========
     const countPipeline = [...pipelineBase, { $count: "totalCount" }];
     const [countResult] = await Record.aggregate(countPipeline);
     const totalCount = countResult?.totalCount || 0;
 
-    // ========== Paginated Results ==========
     const paginatedPipeline = [
       ...pipelineBase,
       { $sort: { parsedDate: 1 } },

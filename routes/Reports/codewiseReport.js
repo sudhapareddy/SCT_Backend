@@ -39,6 +39,7 @@ router.get('/', async (req, res) => {
           totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
           averageFat: { $avg: "$FAT" },
           averageSNF: { $avg: "$SNF" },
+          averageCLR: { $avg: "$CLR" }, // ✅ Added average CLR
           averageRate: { $avg: "$RATE" },
           totalRecords: { $sum: 1 }
         }
@@ -70,6 +71,7 @@ router.get('/', async (req, res) => {
                 totalIncentive: { $sum: "$INCENTIVEAMOUNT" },
                 averageFat: { $avg: "$FAT" },
                 averageSNF: { $avg: "$SNF" },
+                averageCLR: { $avg: "$CLR" }, // ✅ Added average CLR
                 averageRate: { $avg: "$RATE" },
                 totalRecords: { $sum: 1 }
               }
@@ -91,18 +93,21 @@ router.get('/', async (req, res) => {
           totalIncentive: 0,
           averageFat: 0,
           averageSNF: 0,
+          averageCLR: 0,
           averageRate: 0,
           totalRecords: 0
         });
       }
     });
 
+    // Sort and round
     totals.sort((a, b) => milkTypes.indexOf(a._id.milkType) - milkTypes.indexOf(b._id.milkType));
 
     totals = totals.map(item => ({
       ...item,
       averageFat: item.averageFat ? item.averageFat.toFixed(1) : "0.0",
       averageSNF: item.averageSNF ? item.averageSNF.toFixed(1) : "0.0",
+      averageCLR: item.averageCLR ? item.averageCLR.toFixed(1) : "0.0", // ✅ Rounded CLR
       averageRate: item.averageRate ? item.averageRate.toFixed(2) : "0.00",
       totalQuantity: item.totalQuantity?.toFixed(2) || "0.00",
       totalAmount: item.totalAmount?.toFixed(2) || "0.00",
