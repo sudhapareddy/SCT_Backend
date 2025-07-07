@@ -1,13 +1,12 @@
-const express = require('express');
-const Device = require('../../models/DeviceModel');
-const bcrypt = require('bcrypt');
+const express = require("express");
+const Device = require("../../models/DeviceModel");
+const bcrypt = require("bcrypt");
 
 const router = express.Router();
 
 // PUT /api/device/edit/:deviceid
-router.put('/:deviceid', async (req, res) => {
+router.put("/:deviceid", async (req, res) => {
   const { deviceid } = req.params;
-
   const {
     dairyCode,
     status,
@@ -16,49 +15,75 @@ router.put('/:deviceid', async (req, res) => {
     serverSettings,
     email,
     password,
-    oldPassword
+    oldPassword,
   } = req.body;
 
   try {
-    const device = await Device.findOne({ deviceid: deviceid.trim() });
+    const trimmedDeviceId = deviceid.trim();
+    const device = await Device.findOne({ deviceid: trimmedDeviceId });
 
     if (!device) {
-      return res.status(404).json({ error: 'Device not found' });
+      return res.status(404).json({ error: "Device not found" });
     }
 
-    // 🔐 Require old password verification if changing password
+    // 🔐 Password update logic
     if (password) {
       if (!oldPassword) {
-        return res.status(400).json({ error: 'Old password is required to set a new password' });
+        return res
+          .status(400)
+          .json({ error: "Old password is required to set a new password" });
       }
 
       const isMatch = await bcrypt.compare(oldPassword, device.password);
       if (!isMatch) {
-        return res.status(401).json({ error: 'Old password is incorrect' });
+        return res.status(401).json({ error: "Old password is incorrect" });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
-      device.password = hashedPassword;
+      device.password = await bcrypt.hash(password, 10);
+    }
+
+    // 📧 Email duplication check
+    if (email && email.trim().toLowerCase() !== device.email) {
+      const existingEmailDevice = await Device.findOne({
+        email: email.trim().toLowerCase(),
+      });
+      if (existingEmailDevice) {
+        return res
+          .status(400)
+          .json({ error: "Email already in use by another device" });
+      }
+      device.email = email.trim().toLowerCase();
     }
 
     // ✅ Update other fields
-    if (dairyCode) device.dairyCode = dairyCode;
+    if (dairyCode) device.dairyCode = dairyCode.trim();
     if (status) device.status = status;
     if (rateChartIds) device.rateChartIds = rateChartIds;
     if (effectiveDates) device.effectiveDates = effectiveDates;
     if (serverSettings) device.serverSettings = serverSettings;
-    if (email) device.email = email;
 
     await device.save();
 
     res.json({
-      message: 'Device updated successfully',
-      device,
+      message: "Device updated successfully",
+      device: {
+        deviceid: device.deviceid,
+        dairyCode: device.dairyCode,
+        status: device.status,
+        email: device.email,
+        rateChartIds: device.rateChartIds,
+        effectiveDates: device.effectiveDates,
+        serverSettings: device.serverSettings,
+      },
     });
-
   } catch (err) {
-    console.error('Error updating device:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error updating device:", err);
+
+    if (err.code === 11000 && err.keyPattern?.email) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
+
+    res.status(500).json({ error: "Server error" });
   }
 });
 

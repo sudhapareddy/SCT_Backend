@@ -15,9 +15,7 @@ router.get("/", async (req, res) => {
   } = req.query;
 
   if (!deviceId || !fromDate || !toDate || !fromCode || !toCode) {
-    return res
-      .status(400)
-      .json({ error: "Missing required query parameters." });
+    return res.status(400).json({ error: "Missing required query parameters." });
   }
 
   const isBoth = !shift || shift.toLowerCase() === "both";
@@ -38,7 +36,6 @@ router.get("/", async (req, res) => {
     const parsedFrom = new Date(fromDate.split("/").reverse().join("-"));
     const parsedTo = new Date(toDate.split("/").reverse().join("-"));
 
-    // ========== Shared Base Pipeline ==========
     const pipelineBase = [
       {
         $addFields: {
@@ -69,6 +66,7 @@ router.get("/", async (req, res) => {
           totalSamples: { $sum: 1 },
           avgFat: { $avg: "$FAT" },
           avgSnf: { $avg: "$SNF" },
+          avgClr: { $avg: "$CLR" }, // ✅ added
           avgRate: { $avg: "$RATE" },
           totalQty: { $sum: "$QTY" },
           totalAmount: { $sum: { $multiply: ["$QTY", "$RATE"] } },
@@ -88,6 +86,7 @@ router.get("/", async (req, res) => {
               totalSamples: "$totalSamples",
               avgFat: "$avgFat",
               avgSnf: "$avgSnf",
+              avgClr: "$avgClr", // ✅ added
               avgRate: "$avgRate",
               totalQty: "$totalQty",
               totalAmount: "$totalAmount",
@@ -96,9 +95,10 @@ router.get("/", async (req, res) => {
             },
           },
           avgFatAll: { $avg: "$avgFat" },
-          totalSamplesAll: { $sum: "$totalSamples" },
           avgSnfAll: { $avg: "$avgSnf" },
+          avgClrAll: { $avg: "$avgClr" }, // ✅ added
           avgRateAll: { $avg: "$avgRate" },
+          totalSamplesAll: { $sum: "$totalSamples" },
           totalQtyAll: { $sum: "$totalQty" },
           totalAmountAll: { $sum: "$totalAmount" },
           totalIncentiveAll: { $sum: "$totalIncentive" },
@@ -121,6 +121,7 @@ router.get("/", async (req, res) => {
                       totalSamples: "$totalSamplesAll",
                       avgFat: "$avgFatAll",
                       avgSnf: "$avgSnfAll",
+                      avgClr: "$avgClrAll", // ✅ added
                       avgRate: "$avgRateAll",
                       totalQty: "$totalQtyAll",
                       totalAmount: "$totalAmountAll",
@@ -138,6 +139,7 @@ router.get("/", async (req, res) => {
                 totalSamples: "$$stat.totalSamples",
                 avgFat: { $round: ["$$stat.avgFat", 1] },
                 avgSnf: { $round: ["$$stat.avgSnf", 1] },
+                avgClr: { $round: ["$$stat.avgClr", 1] }, // ✅ added
                 avgRate: { $round: ["$$stat.avgRate", 2] },
                 totalQty: { $round: ["$$stat.totalQty", 2] },
                 totalAmount: { $round: ["$$stat.totalAmount", 2] },
@@ -150,12 +152,10 @@ router.get("/", async (req, res) => {
       },
     ];
 
-    // ========== Count Total ==========
     const countPipeline = [...pipelineBase, { $count: "totalCount" }];
     const [countResult] = await Record.aggregate(countPipeline);
     const totalCount = countResult?.totalCount || 0;
 
-    // ========== Paginated Summary Data ==========
     const paginatedPipeline = [
       ...pipelineBase,
       { $sort: { parsedDate: 1 } },
@@ -165,7 +165,6 @@ router.get("/", async (req, res) => {
 
     const summaryData = await Record.aggregate(paginatedPipeline);
 
-    // ========== Raw Records Grouped by Date & Shift ==========
     const rawRecords = await Record.aggregate([
       {
         $addFields: {
@@ -200,6 +199,7 @@ router.get("/", async (req, res) => {
               MILKTYPE: "$MILKTYPE",
               FAT: { $round: ["$FAT", 1] },
               SNF: { $round: ["$SNF", 1] },
+              CLR: { $round: ["$CLR", 1] },
               RATE: { $round: ["$RATE", 2] },
               QTY: { $round: ["$QTY", 2] },
               INCENTIVEAMOUNT: { $round: ["$INCENTIVEAMOUNT", 2] },
@@ -212,7 +212,6 @@ router.get("/", async (req, res) => {
       },
     ]);
 
-    // ========== Merge Raw Records with Summary ==========
     const merged = summaryData.map((summary) => {
       const matched = rawRecords.find(
         (r) => r._id.date === summary.date && r._id.shift === summary.shift
