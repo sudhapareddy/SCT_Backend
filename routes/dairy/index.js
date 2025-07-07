@@ -13,7 +13,7 @@ const authorizeRoles = require('../../middlewares/authorizeRoles');
 router.use('/add', verifyToken, authorizeRoles('admin'), addDairy);
 router.use('/edit', verifyToken, authorizeRoles('admin', 'dairy'), editDairy);
 router.use('/delete', verifyToken, authorizeRoles('admin'), deleteDairy);
-router.use('/', verifyToken, authorizeRoles('admin'), getDairyByCode);
+router.use('/', verifyToken, authorizeRoles('admin', 'dairy'), getDairyByCode);
 router.use('/', verifyToken, authorizeRoles('admin'), getDairy);
 
 module.exports = router;
