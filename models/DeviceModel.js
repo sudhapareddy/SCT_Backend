@@ -7,6 +7,7 @@ const serverSettingsSchema = new mongoose.Schema(
     analyzer: { type: String, default: "U" },
     useCowSnf: { type: String, default: "Y" },
     useBufSnf: { type: String, default: "Y" },
+    clrBasedTable: { type: String, default: "N" },
     highFatAccept: { type: String, default: "Y" },
     lowFatAccept: { type: String, default: "Y" },
     dpuMemberList: { type: String, default: "N" },
