@@ -25,7 +25,7 @@ router.use('/deviceid', verifyToken, authorizeRoles('admin', 'dairy', 'device'),
 
 router.use('/addMember', verifyToken, authorizeRoles('admin', 'dairy', 'device'), addMember);
 router.use('/editMember',  verifyToken, authorizeRoles('admin', 'dairy', 'device'),editMember);
-router.use('/deleteMember',  deleteMember);
+router.use('/deleteMember',  verifyToken,authorizeRoles('admin','dairy','device'),deleteMember);
 
 
 module.exports = router;
