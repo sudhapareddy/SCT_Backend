@@ -27,6 +27,7 @@ router.get("/", async (req, res) => {
     const baseMatch = {
       DEVICEID: deviceId,
       CODE: { $gte: parseInt(fromCode), $lte: parseInt(toCode) },
+      RECORDTYPE: { $ne: 'D' }, // Exclude records where RECORDTYPE is 'D'
     };
 
     if (!isBoth) {

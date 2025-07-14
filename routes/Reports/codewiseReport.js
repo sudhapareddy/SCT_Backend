@@ -38,7 +38,8 @@ router.get('/', async (req, res) => {
         $match: {
           DEVICEID: deviceCode,
           CODE: parseInt(memberCode),
-          parsedDate: { $gte: new Date(fromDate), $lte: new Date(toDate) }
+          parsedDate: { $gte: new Date(fromDate), $lte: new Date(toDate) },
+          RECORDTYPE: { $ne: 'D' }, // Exclude records where RECORDTYPE is 'D'
         }
       },
       {
@@ -70,7 +71,8 @@ router.get('/', async (req, res) => {
               $match: {
                 DEVICEID: deviceCode,
                 CODE: parseInt(memberCode),
-                parsedDate: { $gte: new Date(fromDate), $lte: new Date(toDate) }
+                parsedDate: { $gte: new Date(fromDate), $lte: new Date(toDate) },
+                RECORDTYPE: { $ne: 'D' }, // Exclude records where RECORDTYPE is 'D'
               }
             },
             {
@@ -137,7 +139,8 @@ router.get('/', async (req, res) => {
         $match: {
           DEVICEID: deviceCode,
           CODE: parseInt(memberCode),
-          parsedDate: { $gte: new Date(fromDate), $lte: new Date(toDate) }
+          parsedDate: { $gte: new Date(fromDate), $lte: new Date(toDate) },
+          RECORDTYPE: { $ne: 'D' }, // Exclude records where RECORDTYPE is 'D'
         }
       },
       { $sort: { parsedDate: 1 } }

@@ -17,6 +17,7 @@ router.get("/multiple", async (req, res) => {
     DEVICEID: { $in: deviceCodeArray },
     SAMPLEDATE: date,
     ...(shift ? { SHIFT: shift } : {}),
+    RECORDTYPE: { $ne: 'D' }, // Exclude records where RECORDTYPE is 'D'
   };
 
   try {

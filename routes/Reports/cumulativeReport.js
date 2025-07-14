@@ -24,6 +24,7 @@ router.get("/", async (req, res) => {
     const records = await Record.find({
       DEVICEID: deviceid,
       CODE: { $gte: fromCodeNum, $lte: toCodeNum },
+      RECORDTYPE: { $ne: 'D' }, // Exclude records where RECORDTYPE is 'D'
     });
 
     const filteredRecords = records.filter((rec) => {
