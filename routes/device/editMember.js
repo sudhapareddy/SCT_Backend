@@ -10,8 +10,8 @@ const DevicesList = mongoose.models.DevicesList || mongoose.model('DevicesList',
 router.put('/', async (req, res) => {
   const { deviceid, CODE, MILKTYPE, COMMISSIONTYPE, MEMBERNAME, CONTACTNO, STATUS } = req.body;
 
-  if (!deviceid || CODE == null || !MILKTYPE) {
-    return res.status(400).json({ error: 'deviceid, CODE, and MILKTYPE are required to identify the member.' });
+  if (!deviceid || CODE == null ) {
+    return res.status(400).json({ error: 'deviceid, CODE are required to identify the member.' });
   }
 
   // Field validations
@@ -36,7 +36,7 @@ router.put('/', async (req, res) => {
     }
 
     // Find the member
-    const member = device.members.find(m => m.CODE === CODE && m.MILKTYPE === MILKTYPE);
+    const member = device.members.find(m => m.CODE === CODE);
     if (!member) {
       return res.status(404).json({ error: 'Member not found.' });
     }

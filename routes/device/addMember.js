@@ -25,7 +25,7 @@ const DevicesList = mongoose.models.DevicesList || mongoose.model('DevicesList',
 router.post('/', async (req, res) => {
   const { deviceid, CODE, MILKTYPE, COMMISSIONTYPE, MEMBERNAME, CONTACTNO, STATUS } = req.body;
 
-  if (!deviceid || CODE == null || !MILKTYPE || !COMMISSIONTYPE || !MEMBERNAME || !CONTACTNO || !STATUS) {
+  if (!deviceid || CODE == null || !MILKTYPE || !COMMISSIONTYPE || !MEMBERNAME  || !STATUS) {
     return res.status(400).json({ error: 'All fields are required: deviceId, CODE, MILKTYPE, COMMISSIONTYPE, MEMBERNAME, CONTACTNO, STATUS.' });
   }
 
