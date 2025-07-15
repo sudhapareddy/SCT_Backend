@@ -42,9 +42,9 @@ router.post('/', async (req, res) => {
   if (typeof MEMBERNAME !== 'string' || MEMBERNAME.length > 20) {
     return res.status(400).json({ error: 'MEMBERNAME must be at most 20 characters.' });
   }
-  if (!/^\d{10}$/.test(CONTACTNO)) {
-    return res.status(400).json({ error: 'CONTACTNO must be a 10-digit number.' });
-  }
+  // if (!/^\d{10}$/.test(CONTACTNO)) {
+  //   return res.status(400).json({ error: 'CONTACTNO must be a 10-digit number.' });
+  // }
   if (!['A', 'D'].includes(STATUS)) {
     return res.status(400).json({ error: "STATUS must be 'A' or 'D'." });
   }
