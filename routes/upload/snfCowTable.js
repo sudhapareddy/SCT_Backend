@@ -28,24 +28,32 @@ router.post("/", upload.single("file"), async (req, res) => {
   if (!filePath) return res.status(400).json({ error: "No file uploaded" });
 
   const user = req.user;
-  console.log("user", user);
   if (!user || (user.role !== "dairy" && user.role !== "device")) {
     deleteFile(filePath);
     return res.status(403).json({ error: "Unauthorized user" });
   }
 
-  const isDevice = user.role === "device";
-  const id = isDevice ? user.deviceid : user.dairyCode;
-  if (!id) {
-    deleteFile(filePath);
-    return res.status(400).json({ error: "Missing deviceId or dairyCode" });
+  // Accept deviceId from body for dairy users
+  let isDevice = user.role === "device";
+  let id = isDevice ? user.deviceid : user.dairyCode;
+  let uploadToDeviceId = null;
+
+  if (user.role === "dairy" && req.body.deviceId) {
+    // Check if the device belongs to this dairy
+    const device = await deviceModel.findOne({ deviceid: req.body.deviceId, dairyCode: user.dairyCode });
+    if (!device) {
+      deleteFile(filePath);
+      return res.status(403).json({ error: "Device not found or not under your dairy" });
+    }
+    isDevice = true;
+    id = req.body.deviceId;
+    uploadToDeviceId = req.body.deviceId;
   }
 
   const results = [];
   let headers = [];
 
   const snfCowEffectiveDate = req.body.snfCowEffectiveDate;
-
   const date = new Date(snfCowEffectiveDate);
 
   const dd = String(date.getDate()).padStart(2, "0");

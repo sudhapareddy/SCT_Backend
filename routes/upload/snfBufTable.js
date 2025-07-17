@@ -27,15 +27,6 @@ router.post("/", upload.single("file"), async (req, res) => {
   if (!filePath) return res.status(400).json({ error: "No file uploaded" });
 
   const snfBufEffectiveDate = req.body?.snfBufEffectiveDate;
-
-  const date = new Date(snfBufEffectiveDate);
-
-  const dd = String(date.getDate()).padStart(2, "0");
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const yy = String(date.getFullYear()).slice(-2);
-
-  const formattedDate = dd + mm + yy;
-
   if (!snfBufEffectiveDate) {
     deleteFile(filePath);
     return res
@@ -43,18 +34,33 @@ router.post("/", upload.single("file"), async (req, res) => {
       .json({ error: "Missing snfBufEffectiveDate in request body" });
   }
 
+  const date = new Date(snfBufEffectiveDate);
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yy = String(date.getFullYear()).slice(-2);
+  const formattedDate = dd + mm + yy;
+
   const user = req.user;
   if (!user || (user.role !== "dairy" && user.role !== "device")) {
     deleteFile(filePath);
     return res.status(403).json({ error: "Unauthorized user" });
   }
 
-  const isDevice = user.role === "device";
-  const id = isDevice ? user.deviceid : user.dairyCode;
-  if (!id) {
-    deleteFile(filePath);
-    return res.status(400).json({ error: "Missing deviceId or dairyCode" });
+  // --- NEW LOGIC: Allow dairy user to upload for a specific device ---
+  let isDevice = user.role === "device";
+  let id = isDevice ? user.deviceid : user.dairyCode;
+
+  if (user.role === "dairy" && req.body.deviceId) {
+    // Check if the device belongs to this dairy
+    const device = await deviceModel.findOne({ deviceid: req.body.deviceId, dairyCode: user.dairyCode });
+    if (!device) {
+      deleteFile(filePath);
+      return res.status(403).json({ error: "Device not found or not under your dairy" });
+    }
+    isDevice = true;
+    id = req.body.deviceId;
   }
+  // --- END NEW LOGIC ---
 
   const results = [];
   let headers = [];
@@ -142,8 +148,7 @@ router.post("/", upload.single("file"), async (req, res) => {
         deleteFile(filePath);
 
         res.status(200).json({
-          message: `Uploaded SNF Buf Table to ${isDevice ? "device" : "dairy"
-            } ${id}`,
+          message: `Uploaded SNF Buf Table to ${isDevice ? "device" : "dairy"} ${id}`,
           modifiedCount: updateMain.modifiedCount,
           snfBufId,
           formattedDate,
