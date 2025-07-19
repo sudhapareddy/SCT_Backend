@@ -60,20 +60,32 @@ const DeviceSchema = new mongoose.Schema(
     isDeviceRateTable: {
       fatBufTable: { type: Boolean, default: false },
       fatCowTable: { type: Boolean, default: false },
+
       snfBufTable: { type: Boolean, default: false },
       snfCowTable: { type: Boolean, default: false },
+
+      clrBufTable: { type: Boolean, default: false },
+      clrCowTable: { type: Boolean, default: false },
     },
     rateChartIds: {
       fatBufId: { type: Number, default: 0 },
       fatCowId: { type: Number, default: 0 },
+
       snfBufId: { type: Number, default: 0 },
       snfCowId: { type: Number, default: 0 },
+
+      clrBufId: { type: Number, default: 0 },
+      clrCowId: { type: Number, default: 0 },
     },
     effectiveDates: {
       fatBufEffectiveDate: { type: String, default: "" },
       fatCowEffectiveDate: { type: String, default: "" },
+
       snfBufEffectiveDate: { type: String, default: "" },
       snfCowEffectiveDate: { type: String, default: "" },
+
+      clrBufEffectiveDate: { type: String, default: "" },
+      clrCowEffectiveDate: { type: String, default: "" },
     },
     serverSettings: { type: serverSettingsSchema, default: {} },
     fatCowTable: [
@@ -90,6 +102,10 @@ const DeviceSchema = new mongoose.Schema(
     ],
     snfCowTable: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
     snfBufTable: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+
+    clrCowTable: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+    clrBufTable: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+
     members: [
       {
         CODE: Number,

@@ -40,6 +40,10 @@ const dairySchema = new mongoose.Schema(
     ],
     snfCowTable: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
     snfBufTable: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+
+    clrCowTable: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+    clrBufTable: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+
     createdOn: {
       type: Date,
       default: Date.now,
