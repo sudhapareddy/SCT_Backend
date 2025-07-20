@@ -12,9 +12,38 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+const connectWithRetry = () => {
+  mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('Connected to MongoDB'))
+    .catch((err) => {
+      console.error('MongoDB connection error:', err);
+      console.log('Retrying MongoDB connection in 5 seconds...');
+      setTimeout(connectWithRetry, 5000);
+    });
+};
+
+connectWithRetry();
+
+// Add MongoDB connection event listeners
+mongoose.connection.on('disconnected', () => {
+  console.error('MongoDB disconnected! Attempting to reconnect...');
+  connectWithRetry();
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error event:', err);
+});
+
+// Add global error handlers
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Optionally, shut down gracefully or alert
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception thrown:', err);
+  // Optionally, shut down gracefully or alert
+});
 
 // Import routes
 const authRoutes = require('./routes/auth');
