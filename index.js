@@ -2,8 +2,18 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 // const Dairy = require('./models/DairyModel');
 // const bcrypt = require('bcrypt');
+
+function logErrorToFile(message) {
+  const logPath = path.join(__dirname, 'error.log');
+  const logEntry = `[${new Date().toISOString()}] ${message}\n`;
+  fs.appendFile(logPath, logEntry, (err) => {
+    if (err) console.error('Failed to write to error.log:', err);
+  });
+}
 
 const app = express();
 
@@ -26,22 +36,30 @@ connectWithRetry();
 
 // Add MongoDB connection event listeners
 mongoose.connection.on('disconnected', () => {
-  console.error('MongoDB disconnected! Attempting to reconnect...');
+  const msg = 'MongoDB disconnected! Attempting to reconnect...';
+  console.error(msg);
+  logErrorToFile(msg);
   connectWithRetry();
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error('MongoDB connection error event:', err);
+  const msg = `MongoDB connection error event: ${err}`;
+  console.error(msg);
+  logErrorToFile(msg);
 });
 
 // Add global error handlers
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  const msg = `Unhandled Rejection at: ${promise}, reason: ${reason}`;
+  console.error(msg);
+  logErrorToFile(msg);
   // Optionally, shut down gracefully or alert
 });
 
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception thrown:', err);
+  const msg = `Uncaught Exception thrown: ${err}`;
+  console.error(msg);
+  logErrorToFile(msg);
   // Optionally, shut down gracefully or alert
 });
 
