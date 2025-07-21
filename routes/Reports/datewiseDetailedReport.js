@@ -207,6 +207,8 @@ router.get("/", async (req, res) => {
               FAT: { $round: ["$FAT", 1] },
               SNF: { $round: ["$SNF", 1] },
               CLR: { $round: ["$CLR", 1] },
+,              ANALYZERMODE : "ANALYZERMODE",
+              WEIGHTMODE : "WEIGHTMODE"
               RATE: { $round: ["$RATE", 2] },
               QTY: { $round: ["$QTY", 2] },
               INCENTIVEAMOUNT: { $round: ["$INCENTIVEAMOUNT", 2] },
