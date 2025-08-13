@@ -1,17 +1,17 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
 // const Dairy = require('./models/DairyModel');
 // const bcrypt = require('bcrypt');
 
 function logErrorToFile(message) {
-  const logPath = path.join(__dirname, 'error.log');
+  const logPath = path.join(__dirname, "error.log");
   const logEntry = `[${new Date().toISOString()}] ${message}\n`;
   fs.appendFile(logPath, logEntry, (err) => {
-    if (err) console.error('Failed to write to error.log:', err);
+    if (err) console.error("Failed to write to error.log:", err);
   });
 }
 
@@ -23,11 +23,12 @@ app.use(express.json());
 
 // MongoDB connection
 const connectWithRetry = () => {
-  mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('Connected to MongoDB'))
+  mongoose
+    .connect(process.env.MONGO_URI)
+    .then(() => console.log("Connected to MongoDB"))
     .catch((err) => {
-      console.error('MongoDB connection error:', err);
-      console.log('Retrying MongoDB connection in 5 seconds...');
+      console.error("MongoDB connection error:", err);
+      console.log("Retrying MongoDB connection in 5 seconds...");
       setTimeout(connectWithRetry, 5000);
     });
 };
@@ -35,28 +36,28 @@ const connectWithRetry = () => {
 connectWithRetry();
 
 // Add MongoDB connection event listeners
-mongoose.connection.on('disconnected', () => {
-  const msg = 'MongoDB disconnected! Attempting to reconnect...';
+mongoose.connection.on("disconnected", () => {
+  const msg = "MongoDB disconnected! Attempting to reconnect...";
   console.error(msg);
   logErrorToFile(msg);
   connectWithRetry();
 });
 
-mongoose.connection.on('error', (err) => {
+mongoose.connection.on("error", (err) => {
   const msg = `MongoDB connection error event: ${err}`;
   console.error(msg);
   logErrorToFile(msg);
 });
 
 // Add global error handlers
-process.on('unhandledRejection', (reason, promise) => {
+process.on("unhandledRejection", (reason, promise) => {
   const msg = `Unhandled Rejection at: ${promise}, reason: ${reason}`;
   console.error(msg);
   logErrorToFile(msg);
   // Optionally, shut down gracefully or alert
 });
 
-process.on('uncaughtException', (err) => {
+process.on("uncaughtException", (err) => {
   const msg = `Uncaught Exception thrown: ${err}`;
   console.error(msg);
   logErrorToFile(msg);
@@ -64,12 +65,13 @@ process.on('uncaughtException', (err) => {
 });
 
 // Import routes
-const authRoutes = require('./routes/auth');
+const authRoutes = require("./routes/auth");
 
-const dairyRoutes = require('./routes/dairy');
-const deviceRoutes = require('./routes/device');
-const reportRoutes = require('./routes/Reports');
-const uploadRoutes = require('./routes/upload');
+const dairyRoutes = require("./routes/dairy");
+const deviceRoutes = require("./routes/device");
+const reportRoutes = require("./routes/Reports");
+const uploadRoutes = require("./routes/upload");
+const recordRoutes = require("./routes/records");
 // async function createAdmin() {
 //   const existingAdmin = await Dairy.findOne({ email: 'admin@example.com' });
 //   if (!existingAdmin) {
@@ -89,26 +91,28 @@ const uploadRoutes = require('./routes/upload');
 
 // createAdmin();
 // Mount routes
-app.use('/api/auth', authRoutes);
+app.use("/api/auth", authRoutes);
 
 // Dairy routes
-app.use('/api/dairy', dairyRoutes);  // handles all dairy-related routes (add, edit, delete)
+app.use("/api/dairy", dairyRoutes); // handles all dairy-related routes (add, edit, delete)
 
 // Device routes
-app.use('/api/device', deviceRoutes);  // handles all device-related routes (add, edit, delete)
+app.use("/api/device", deviceRoutes); // handles all device-related routes (add, edit, delete)
 
-app.use('/api/reports', reportRoutes);
+app.use("/api/reports", reportRoutes);
 
-app.use('/api/upload', uploadRoutes);
+app.use("/api/upload", uploadRoutes);
+
+app.use("/api/records", recordRoutes);
 
 // Test route
-app.get('/', (req, res) => {
-  res.send('API is running...');
+app.get("/", (req, res) => {
+  res.send("API is running...");
 });
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  res.status(404).json({ error: "Not found" });
 });
 
 // Start server
