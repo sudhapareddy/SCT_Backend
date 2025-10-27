@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const recordSchema = new mongoose.Schema({
   DEVICEID: String,
   CODE: Number,
+  NAME: String,
   MILKTYPE: String,
   FAT: Number,
   SNF: Number,
